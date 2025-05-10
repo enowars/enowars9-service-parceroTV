@@ -1,0 +1,13 @@
+services:
+  parcerotv:
+    build: .
+    # The code should be copied into the container using COPY.
+    # Mount the data folder writable, so that information can be persisted across restarts.
+    volumes:
+      - ./data/:/service/data:rw
+    # Define the port mapping (external:internal port)
+    ports:
+      - "7777:8000"
+    restart: unless-stopped
+    mem_limit: 1g
+    cpus: 1
