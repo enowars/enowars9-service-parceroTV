@@ -1,0 +1,24 @@
+CREATE TABLE users (
+    UserID INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL CHECK(length(name) <= 20),
+    password TEXT NOT NULL CHECK(length(password) <= 200),
+    about TEXT CHECK(length(about) <= 2000)
+);
+
+CREATE TABLE videos(
+    VideoID INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL CHECK(length(name) <= 20),
+    description TEXT CHECK(length(description) <= 1000),
+    source BLOB NOT NULL,
+    UserID INTEGER,
+    FOREIGN KEY (UserID) REFERENCES users(UserID) ON DELETE CASCADE
+);
+
+CREATE TABLE comments(
+    CommentsID INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    comment TEXT NOT NULL,
+    UserID INTEGER,
+    VideoID INTEGER,
+    FOREIGN KEY (UserID) REFERENCES users(UserID) ON DELETE CASCADE,
+    FOREIGN KEY (VideoID) REFERENCES videos(VideoID) ON DELETE CASCADE
+);
