@@ -2,6 +2,7 @@ use actix_files::Files;
 use actix_web::{
     App, Error, HttpResponse, HttpServer, Responder, error, get, middleware, post, web,
 };
+use actix_files::NamedFile;
 use serde::Deserialize;
 
 use r2d2_sqlite::SqliteConnectionManager;
@@ -16,6 +17,12 @@ use actix_web::cookie::{ Key, SameSite };
 #[get("/")]
 async fn hello() -> impl Responder {
     HttpResponse::Ok().body("Hello world!")
+}
+
+#[get("/video/{ok}")]
+async fn get_video(path: web::Path<String>) -> Result<NamedFile, Error> {
+    let filename = path.into_inner();
+    Ok(NamedFile::open("ok.mp4")?)
 }
 
 #[post("/echo")]
@@ -74,7 +81,7 @@ async fn newuser(
     Ok(HttpResponse::Ok().body("User created!"))
 }
 
-#[get("/{filename}")]
+#[get("/app/{filename}")]
 async fn protected_route(session: Session, path: web::Path<String>) -> Result<impl Responder, Error> {
     if let Ok(Some(user_id)) = session.get::<i32>("user_id") {
         let filename = path.into_inner();
@@ -114,6 +121,7 @@ async fn main() -> std::io::Result<()> {
             .service(newuser)
             .service(check_credentials)
             .service(protected_route)
+            .service(get_video)
             .service(Files::new("/login", "../frontend").index_file("login.html"))
             .service(Files::new("/register", "../frontend").index_file("register.html"))
             .service(Files::new("/js", "../frontend/js").show_files_listing())
