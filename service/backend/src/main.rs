@@ -108,7 +108,7 @@ fn session_middleware() -> SessionMiddleware<CookieSessionStore> {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    let manager = SqliteConnectionManager::file("parcerotv.db");
+    let manager = SqliteConnectionManager::file("../data/parcerotv.db");
     let pool = Pool::new(manager).unwrap();
 
     HttpServer::new(move || {

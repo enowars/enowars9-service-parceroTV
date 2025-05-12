@@ -13,16 +13,16 @@ COPY entrypoint.sh /
 RUN chmod +x /entrypoint.sh
 
 # Copy our service
-COPY /backend/src/ /service/src
-COPY /backend/Cargo.toml /service/
+COPY /backend/src/ /service/backend/src
+COPY /backend/Cargo.toml /service/backend
+COPY /frontend/ /service/frontend 
 
 
 # Change the working directory.
-WORKDIR /service/
+WORKDIR /service/backend/
 # Compile our service
 RUN ls -la
 RUN cargo build --release
-
 
 # Expose the service's port
 EXPOSE 8000
