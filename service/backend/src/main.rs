@@ -1,12 +1,11 @@
-use actix_web::{middleware, get, post, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{middleware, get, post, web, error, Error, App, HttpResponse, HttpServer, Responder};
 use actix_files::Files;
 use serde::Deserialize;
 
 use r2d2_sqlite::SqliteConnectionManager;
-use backend::create_user
 
 mod db;
-use db::{Pool};
+use db::{Pool, create_user};
 
 
 
@@ -26,27 +25,36 @@ async fn manual_hello() -> impl Responder {
 
 #[derive(Deserialize)]
 struct FormInput {
-    name: String,
+    username: String,
     password: String,
 }
 
 #[post("/newuser")]
-async fn newuser(pool: web::Data<DbPool>,form: web::Form<FormInput>) -> impl Responder {
-    let user = web::block(move || {
-        // Obtaining a connection from the pool is also a potentially blocking operation.
-        // So, it should be called within the `web::block` closure, as well.
-        let mut conn = pool.get().expect("couldn't get db connection from pool");
+async fn newuser(
+    pool: web::Data<Pool>,
+    form: web::Form<FormInput>,
+) -> Result<impl Responder, Error> {
+    let form = form.into_inner();
+    let pool = pool.clone();
+    
+    let conn = web::block(move || pool.get())
+        .await?
+        .map_err(error::ErrorInternalServerError)?; 
 
-        create_user(&mut conn, &form.name, &form.password);
-    })
+    let name = form.username.clone();
+    let password = form.password.clone();
+    println!("{name} {password}");
+    web::block(move || 
+        create_user(conn, &name, &password))
     .await?
-    .map_err(error::ErrorInternalServerError)?;
-    HttpResponse::Ok().body("Hello world!")
+    .map_err(error::ErrorInternalServerError);
+
+    Ok(HttpResponse::Ok().body("User created!"))
 }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    let manager = SqliteConnectionManager::file("../db/parcerotv.db");
+    let manager = SqliteConnectionManager::file("parcerotv.db");
     let pool = Pool::new(manager).unwrap();
 
 
@@ -57,6 +65,7 @@ async fn main() -> std::io::Result<()> {
             .service(echo)
             .service(Files::new("/login", "../frontend").index_file("login.html"))
             .route("/hey", web::get().to(manual_hello))
+            .service(newuser)
     })
     .bind(("0.0.0.0", 8000))?
     .run()
