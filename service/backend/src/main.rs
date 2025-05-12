@@ -8,6 +8,10 @@ use r2d2_sqlite::SqliteConnectionManager;
 
 mod db;
 use db::{Pool, create_user, get_db_conn, select_password};
+use actix_session::{ SessionMiddleware, Session };
+use actix_session::config::{ BrowserSession, CookieContentSecurity };
+use actix_session::storage::{ CookieSessionStore };
+use actix_web::cookie::{ Key, SameSite };
 
 #[get("/")]
 async fn hello() -> impl Responder {
@@ -33,6 +37,7 @@ struct FormInput {
 async fn check_credentials(
     pool: web::Data<Pool>,
     form: web::Form<FormInput>,
+    session: Session
 ) -> Result<impl Responder, Error> {
     let form = form.into_inner();
     let conn = get_db_conn(pool).await?;
@@ -43,7 +48,9 @@ async fn check_credentials(
         .await?
         .map_err(error::ErrorInternalServerError)?;
 
+    println!("{password} und {typed_password}");
     if (password == typed_password) {
+        session.insert("user_id", 1).unwrap();
         return Ok(HttpResponse::Ok().body("User authenticated!"));
     } else {
         return Ok(HttpResponse::Ok().body("User not auth!"));
@@ -67,6 +74,31 @@ async fn newuser(
     Ok(HttpResponse::Ok().body("User created!"))
 }
 
+#[get("/{filename}")]
+async fn protected_route(session: Session, path: web::Path<String>) -> Result<impl Responder, Error> {
+    if let Ok(Some(user_id)) = session.get::<i32>("user_id") {
+        let filename = path.into_inner();
+        let html_content = std::fs::read_to_string("../frontend/profile.html")
+        .unwrap_or_else(|_| "<h1>404: File Not Found</h1>".to_string());
+        Ok(actix_web::HttpResponse::Ok().content_type("text/html").body(html_content))
+    } else {
+        Ok(HttpResponse::Unauthorized().body("Please log in"))
+    }
+}
+
+fn session_middleware() -> SessionMiddleware<CookieSessionStore> {
+    SessionMiddleware::builder(
+        CookieSessionStore::default(), Key::from(&[0; 64])
+    )
+	.cookie_name(String::from("session")) // arbitrary name
+	.cookie_secure(false) // https only
+	.session_lifecycle(BrowserSession::default()) // expire at end of session
+	.cookie_same_site(SameSite::Strict) 
+	.cookie_content_security(CookieContentSecurity::Private) // encrypt
+	.cookie_http_only(true) // disallow scripts from reading
+	.build()
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let manager = SqliteConnectionManager::file("parcerotv.db");
@@ -74,14 +106,18 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(move || {
         App::new()
+            .wrap(session_middleware())
             .app_data(web::Data::new(pool.clone()))
             .service(hello)
             .service(echo)
-            .service(Files::new("/login", "../frontend").index_file("login.html"))
-            .service(Files::new("/register", "../frontend").index_file("login.html"))
             .route("/hey", web::get().to(manual_hello))
             .service(newuser)
             .service(check_credentials)
+            .service(protected_route)
+            .service(Files::new("/login", "../frontend").index_file("login.html"))
+            .service(Files::new("/register", "../frontend").index_file("register.html"))
+            .service(Files::new("/js", "../frontend/js").show_files_listing())
+            .service(Files::new("/css", "../frontend/css"))
     })
     .bind(("0.0.0.0", 8000))?
     .run()
