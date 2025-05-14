@@ -19,11 +19,6 @@ async fn hello() -> impl Responder {
     HttpResponse::Ok().body("Hello world!")
 }
 
-#[get("/video/{ok}")]
-async fn get_video(path: web::Path<String>) -> Result<NamedFile, Error> {
-    let filename = path.into_inner();
-    Ok(NamedFile::open("ok.mp4")?)
-}
 
 #[post("/echo")]
 async fn echo(req_body: String) -> impl Responder {
@@ -58,7 +53,9 @@ async fn check_credentials(
     println!("{password} und {typed_password}");
     if (password == typed_password) {
         session.insert("user_id", 1).unwrap();
-        return Ok(HttpResponse::Ok().body("User authenticated!"));
+        return Ok(HttpResponse::SeeOther()
+        .append_header(("Location", "/app/home"))
+        .finish());
     } else {
         return Ok(HttpResponse::Ok().body("User not auth!"));
     }
@@ -81,16 +78,32 @@ async fn newuser(
     Ok(HttpResponse::Ok().body("User created!"))
 }
 
-#[get("/app/{filename}")]
-async fn protected_route(session: Session, path: web::Path<String>) -> Result<impl Responder, Error> {
-    if let Ok(Some(user_id)) = session.get::<i32>("user_id") {
-        let filename = path.into_inner();
-        let html_content = std::fs::read_to_string("../frontend/profile.html")
-        .unwrap_or_else(|_| "<h1>404: File Not Found</h1>".to_string());
-        Ok(actix_web::HttpResponse::Ok().content_type("text/html").body(html_content))
+async fn serve_file_or_reject(session: Session, path: &str) -> Result<impl Responder, Error> {
+    if let Ok(Some(_user_id)) = session.get::<i32>("user_id") {
+        let html_content = std::fs::read_to_string(path)
+            .unwrap_or_else(|_| "<h1>404: File Not Found</h1>".to_string());
+        Ok(HttpResponse::Ok()
+            .content_type("text/html")
+            .body(html_content))
     } else {
         Ok(HttpResponse::Unauthorized().body("Please log in"))
     }
+}
+
+#[get("/profile")]
+async fn profile(session: Session) -> Result<impl Responder, Error> {
+    serve_file_or_reject(session, "../frontend/profile.html").await
+}
+
+#[get("/home")]
+async fn home(session: Session)  -> Result<impl Responder, Error> {
+    serve_file_or_reject(session, "../frontend/home.html").await
+}
+
+
+#[get("/videos")]
+async fn videos(session: Session)  -> Result<impl Responder, Error> {
+    serve_file_or_reject(session, "../frontend/videos.html").await
 }
 
 fn session_middleware() -> SessionMiddleware<CookieSessionStore> {
@@ -120,12 +133,15 @@ async fn main() -> std::io::Result<()> {
             .route("/hey", web::get().to(manual_hello))
             .service(newuser)
             .service(check_credentials)
-            .service(protected_route)
-            .service(get_video)
             .service(Files::new("/login", "../frontend").index_file("login.html"))
             .service(Files::new("/register", "../frontend").index_file("register.html"))
-            .service(Files::new("/js", "../frontend/js").show_files_listing())
-            .service(Files::new("/css", "../frontend/css"))
+            .service(Files::new("/js", "../frontend/js/").show_files_listing())
+            .service(Files::new("/css", "../frontend/css/"))
+            .service(Files::new("/videos", "../data/videos/").show_files_listing())
+            .service(web::scope("/app")
+                        .service(profile)
+                        .service(home)
+                        .service(videos))       
     })
     .bind(("0.0.0.0", 8000))?
     .run()
