@@ -111,7 +111,7 @@ pub fn create_comment(conn:Connection) -> Result<()> {
 
 
 //Structs
-#[derive(Debug, Serialize)]
+#[derive(Debug, serde::Serialize)]
 pub struct VideoInfo{
     pub id: i32,
     pub name: String,

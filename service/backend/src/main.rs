@@ -146,7 +146,7 @@ async fn create_video(pool:web::Data<Pool>,session: Session, MultipartForm(video
 async fn fetch_all_videos(pool:web::Data<Pool>,session: Session,) -> Result<impl Responder, Error> {
     let conn = get_db_conn(pool).await?;
 
-    let videoss = web::block(move || get_all_videos(conn)).await?.map_err(error::ErrorInternalServerError);
+    let videoss = web::block(move || get_all_videos(conn)).await?.map_err(error::ErrorInternalServerError)?;
     Ok(HttpResponse::Ok().json(videoss))
 }
 
@@ -187,6 +187,7 @@ async fn main() -> std::io::Result<()> {
                     .service(videos)
                     .service(create_video),
             )
+            .service(fetch_all_videos)
     })
     .bind(("0.0.0.0", 8000))?
     .run()
