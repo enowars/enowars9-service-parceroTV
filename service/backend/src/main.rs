@@ -9,6 +9,7 @@ use actix_web::{
 mod forms;
 use backend::get_path;
 use backend::save_video;
+use db::get_all_videos;
 use forms::{FormInput, VideoForm};
 
 use r2d2_sqlite::SqliteConnectionManager;
@@ -138,6 +139,15 @@ async fn create_video(pool:web::Data<Pool>,session: Session, MultipartForm(video
     } else {
         Ok(HttpResponse::Unauthorized().body("Please log in"))
     }
+}
+
+//API
+#[get("/api/fetch_all_videos")]
+async fn fetch_all_videos(pool:web::Data<Pool>,session: Session,) -> Result<impl Responder, Error> {
+    let conn = get_db_conn(pool).await?;
+
+    let videoss = web::block(move || get_all_videos(conn)).await?.map_err(error::ErrorInternalServerError);
+    Ok(HttpResponse::Ok().json(videoss))
 }
 
 fn session_middleware() -> SessionMiddleware<CookieSessionStore> {

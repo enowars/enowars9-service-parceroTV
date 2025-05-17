@@ -24,7 +24,7 @@ pub fn create_user(conn: Connection, name: &str, password: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn get_all_videos(conn: &Connection) -> Result<Vec<VideoInfo>> {
+pub fn get_all_videos(conn: Connection) -> Result<Vec<VideoInfo>> {
     let mut stmt = conn.prepare("SELECT id, name, description, thumbnail_path FROM videos WHERE is_private = 0")?;
 
     let videos = stmt
@@ -111,7 +111,7 @@ pub fn create_comment(conn:Connection) -> Result<()> {
 
 
 //Structs
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct VideoInfo{
     pub id: i32,
     pub name: String,
