@@ -21,10 +21,24 @@ use actix_web::cookie::{Key, SameSite};
 use db::{Pool, create_user, insert_video, get_db_conn, select_password};
 
 
-#[get("/")]
-async fn hello() -> impl Responder {
-    HttpResponse::Ok().body("Hello world!")
+macro_rules! redirect {
+    ($path:expr) => {
+        HttpResponse::SeeOther()
+            .append_header(("Location", $path))
+            .finish();
+    };
 }
+
+
+#[get("/")]
+async fn hello(session: Session) -> Result<HttpResponse, Error> {
+    if let Ok(Some(_user_id)) = session.get::<u32>("user_id") {
+        Ok(redirect!("/app/home"))
+    } else {
+        Ok(redirect!("/login"))
+    }
+}
+
 
 #[post("/echo")]
 async fn echo(req_body: String) -> impl Responder {
@@ -54,9 +68,7 @@ async fn check_credentials(
     println!("{password} und {typed_password}");
     if (password == typed_password) {
         session.insert("user_id", 1).unwrap();
-        return Ok(HttpResponse::SeeOther()
-            .append_header(("Location", "/app/home"))
-            .finish());
+        return Ok(redirect!("/app/home"));
     } else {
         return Ok(HttpResponse::Ok().body("User not auth!"));
     }
@@ -130,12 +142,12 @@ async fn create_video(pool:web::Data<Pool>,session: Session, MultipartForm(video
 
 fn session_middleware() -> SessionMiddleware<CookieSessionStore> {
     SessionMiddleware::builder(CookieSessionStore::default(), Key::from(&[0; 64]))
-        .cookie_name(String::from("session")) // arbitrary name
-        .cookie_secure(false) // https only
-        .session_lifecycle(BrowserSession::default()) // expire at end of session
+        .cookie_name(String::from("session")) 
+        .cookie_secure(false)
+        .session_lifecycle(BrowserSession::default()) 
         .cookie_same_site(SameSite::Strict)
-        .cookie_content_security(CookieContentSecurity::Private) // encrypt
-        .cookie_http_only(true) // disallow scripts from reading
+        .cookie_content_security(CookieContentSecurity::Private) 
+        .cookie_http_only(true) 
         .build()
 }
 

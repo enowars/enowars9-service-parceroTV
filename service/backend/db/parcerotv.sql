@@ -10,6 +10,7 @@ CREATE TABLE videos(
     name TEXT NOT NULL CHECK(length(name) <= 20),
     description TEXT NOT NULL CHECK(length(description) <= 1000),
     path TEXT NOT NULL,
+    thumbnail_path TEXT NOT NULL,
     UserID INTEGER,
     is_private INTEGER NOT NULL,
     FOREIGN KEY (UserID) REFERENCES users(UserID) ON DELETE CASCADE

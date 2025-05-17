@@ -34,16 +34,14 @@ pub fn save_video(path: &str, mut file: File) -> io::Result<()> {
         return Ok(());
     }
 
-    // Ensure the parent directory exists
     if let Some(parent) = target_path.parent() {
         fs::create_dir_all(parent)?;
     }
 
     let mut buffer = Vec::new();
-    file.read_to_end(&mut buffer)?; // read from the input file
-
+    file.read_to_end(&mut buffer)?;
     let mut output = File::create(target_path)?;
-    output.write_all(&buffer)?; // write to the output path
+    output.write_all(&buffer)?;
 
     println!("File saved at: {}", path);
     Ok(())
