@@ -11,4 +11,9 @@ r2d2 = "0.8"
 r2d2_sqlite = "0.24"
 rusqlite = "^0.31"
 serde = { version = "1", features = ["derive"] }
-diesel = { version = "2.2.0", features = ["sqlite", "returning_clauses_for_sqlite_3_35"] }
+bytes = "1.6"
+tempfile = "3.20.0"
+ffmpeg-next = "7.1.0"
+multipart = "0.18.0"
+actix-multipart = "0.7.2"
+futures-util = "0.3.31"

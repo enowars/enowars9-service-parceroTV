@@ -1,24 +1,30 @@
+use std::io::Write;
+
 use actix_files::Files;
+use actix_files::NamedFile;
+use actix_multipart::form::MultipartForm;
 use actix_web::{
     App, Error, HttpResponse, HttpServer, Responder, error, get, middleware, post, web,
 };
-use actix_files::NamedFile;
-use serde::Deserialize;
+mod forms;
+use backend::get_path;
+use backend::save_video;
+use forms::{FormInput, VideoForm};
 
 use r2d2_sqlite::SqliteConnectionManager;
-
+use tempfile::NamedTempFile;
 mod db;
-use db::{Pool, create_user, get_db_conn, select_password};
-use actix_session::{ SessionMiddleware, Session };
-use actix_session::config::{ BrowserSession, CookieContentSecurity };
-use actix_session::storage::{ CookieSessionStore };
-use actix_web::cookie::{ Key, SameSite };
+use actix_session::config::{BrowserSession, CookieContentSecurity};
+use actix_session::storage::CookieSessionStore;
+use actix_session::{Session, SessionMiddleware};
+use actix_web::cookie::{Key, SameSite};
+use db::{Pool, create_user, insert_video, get_db_conn, select_password};
+
 
 #[get("/")]
 async fn hello() -> impl Responder {
     HttpResponse::Ok().body("Hello world!")
 }
-
 
 #[post("/echo")]
 async fn echo(req_body: String) -> impl Responder {
@@ -29,17 +35,12 @@ async fn manual_hello() -> impl Responder {
     HttpResponse::Ok().body("Hey there!")
 }
 
-#[derive(Deserialize)]
-struct FormInput {
-    username: String,
-    password: String,
-}
 
 #[post("/checkcredentials")]
 async fn check_credentials(
     pool: web::Data<Pool>,
     form: web::Form<FormInput>,
-    session: Session
+    session: Session,
 ) -> Result<impl Responder, Error> {
     let form = form.into_inner();
     let conn = get_db_conn(pool).await?;
@@ -54,8 +55,8 @@ async fn check_credentials(
     if (password == typed_password) {
         session.insert("user_id", 1).unwrap();
         return Ok(HttpResponse::SeeOther()
-        .append_header(("Location", "/app/home"))
-        .finish());
+            .append_header(("Location", "/app/home"))
+            .finish());
     } else {
         return Ok(HttpResponse::Ok().body("User not auth!"));
     }
@@ -71,7 +72,7 @@ async fn newuser(
     let name = form.username.clone();
     let password = form.password.clone();
     println!("{name} {password}");
-    web::block(move || create_user(conn, &name, &password))
+    let _ = web::block(move || create_user(conn, &name, &password))
         .await?
         .map_err(error::ErrorInternalServerError);
 
@@ -96,27 +97,46 @@ async fn profile(session: Session) -> Result<impl Responder, Error> {
 }
 
 #[get("/home")]
-async fn home(session: Session)  -> Result<impl Responder, Error> {
+async fn home(session: Session) -> Result<impl Responder, Error> {
     serve_file_or_reject(session, "../frontend/home.html").await
 }
 
-
 #[get("/videos")]
-async fn videos(session: Session)  -> Result<impl Responder, Error> {
+async fn videos(session: Session) -> Result<impl Responder, Error> {
     serve_file_or_reject(session, "../frontend/videos.html").await
 }
 
+#[post("create_video")]
+async fn create_video(pool:web::Data<Pool>,session: Session, MultipartForm(video_form): MultipartForm<VideoForm>) -> Result<impl Responder, Error> {
+    println!("We are here");
+    if let Ok(Some(user_id)) = session.get::<u32>("user_id") {
+        println!{"Video Form, Title {}, Desc.: {}, ",*video_form.name, *video_form.description};
+        let file_to_save = video_form.file.file.reopen()?;
+        let path = get_path(*video_form.is_private, &video_form.name, video_form.file.file);
+        let path_clone = path.clone();
+        
+        let conn = get_db_conn(pool).await?;
+
+        let _ = web::block(move || insert_video(conn, &video_form.name, &video_form.description, &path, &user_id, &video_form.is_private))
+        .await?
+        .map_err(error::ErrorInternalServerError);
+
+        save_video(&path_clone, file_to_save)?;
+        Ok(HttpResponse::Ok().body("Video created!"))
+    } else {
+        Ok(HttpResponse::Unauthorized().body("Please log in"))
+    }
+}
+
 fn session_middleware() -> SessionMiddleware<CookieSessionStore> {
-    SessionMiddleware::builder(
-        CookieSessionStore::default(), Key::from(&[0; 64])
-    )
-	.cookie_name(String::from("session")) // arbitrary name
-	.cookie_secure(false) // https only
-	.session_lifecycle(BrowserSession::default()) // expire at end of session
-	.cookie_same_site(SameSite::Strict) 
-	.cookie_content_security(CookieContentSecurity::Private) // encrypt
-	.cookie_http_only(true) // disallow scripts from reading
-	.build()
+    SessionMiddleware::builder(CookieSessionStore::default(), Key::from(&[0; 64]))
+        .cookie_name(String::from("session")) // arbitrary name
+        .cookie_secure(false) // https only
+        .session_lifecycle(BrowserSession::default()) // expire at end of session
+        .cookie_same_site(SameSite::Strict)
+        .cookie_content_security(CookieContentSecurity::Private) // encrypt
+        .cookie_http_only(true) // disallow scripts from reading
+        .build()
 }
 
 #[actix_web::main]
@@ -138,10 +158,13 @@ async fn main() -> std::io::Result<()> {
             .service(Files::new("/js", "../frontend/js/").show_files_listing())
             .service(Files::new("/css", "../frontend/css/"))
             .service(Files::new("/videos", "../data/videos/").show_files_listing())
-            .service(web::scope("/app")
-                        .service(profile)
-                        .service(home)
-                        .service(videos))       
+            .service(
+                web::scope("/app")
+                    .service(profile)
+                    .service(home)
+                    .service(videos)
+                    .service(create_video),
+            )
     })
     .bind(("0.0.0.0", 8000))?
     .run()

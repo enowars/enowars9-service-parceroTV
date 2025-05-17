@@ -45,11 +45,13 @@ pub fn update_about_user(conn: Connection, about:&str, name:&str) -> Result<()> 
 
 
 
-pub fn create_video(conn: Connection, name:&str, description: &str, source: &Vec<u8>, user_id: &u32) -> Result<()> {
+pub fn insert_video(conn: Connection, name:&str, description: &str, path: &str, user_id: &u32, is_private: &u32) -> Result<()> {
+    println!("Insert {} {} {}", name, description, path);
     conn.execute(
-        "INSERT INTO videos (name, description, source, UserID) VALUES (?1, ?2, ?3, ?4)",
-        (name, description, source, user_id)
+        "INSERT INTO videos (name, description, path, UserID, is_private) VALUES (?1, ?2, ?3, ?4, ?5)",
+        (name, description, path, user_id, is_private)
     )?;
+    
     Ok(())
 }
 

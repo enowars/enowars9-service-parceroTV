@@ -9,8 +9,9 @@ CREATE TABLE videos(
     VideoID INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL CHECK(length(name) <= 20),
     description TEXT NOT NULL CHECK(length(description) <= 1000),
-    source BLOB NOT NULL,
+    path TEXT NOT NULL,
     UserID INTEGER,
+    is_private INTEGER NOT NULL,
     FOREIGN KEY (UserID) REFERENCES users(UserID) ON DELETE CASCADE
 );
 
