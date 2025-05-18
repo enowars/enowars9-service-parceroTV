@@ -147,7 +147,7 @@ async fn create_video(pool:web::Data<Pool>,session: Session, MultipartForm(video
 
         save_thumbnail(&thumbnail_path_clone, thumbnail_to_save)?;
         save_video(&path_clone, file_to_save)?;
-        Ok(HttpResponse::Ok().body("Video created!"))
+        Ok(redirect!("/app/home"))
     } else {
         Ok(HttpResponse::Unauthorized().body("Please log in"))
     }
@@ -156,6 +156,7 @@ async fn create_video(pool:web::Data<Pool>,session: Session, MultipartForm(video
 //API
 #[get("/api/fetch_all_videos")]
 async fn fetch_all_videos(pool:web::Data<Pool>, session: Session,) -> Result<impl Responder, Error> {
+    println!("/api/fetch_all_videos");
     let conn = get_db_conn(pool).await?;
 
     let videoss = web::block(move || get_all_videos(conn)).await?.map_err(error::ErrorInternalServerError)?;
@@ -192,6 +193,7 @@ async fn main() -> std::io::Result<()> {
             .service(Files::new("/js", "../frontend/js/").show_files_listing())
             .service(Files::new("/css", "../frontend/css/"))
             .service(Files::new("/videos", "../data/videos/").show_files_listing())
+            .service(Files::new("/thumbnails", "../data/thumbnails/").show_files_listing())
             .service(
                 web::scope("/app")
                     .service(profile)

@@ -25,7 +25,7 @@ pub fn create_user(conn: Connection, name: &str, password: &str) -> Result<()> {
 }
 
 pub fn get_all_videos(conn: Connection) -> Result<Vec<VideoInfo>> {
-    let mut stmt = conn.prepare("SELECT id, name, description, thumbnail_path FROM videos WHERE is_private = 0")?;
+    let mut stmt = conn.prepare("SELECT videoid, name, description, thumbnail_path, path FROM videos WHERE is_private = 0")?;
 
     let videos = stmt
         .query_map([], |row| {
@@ -38,7 +38,7 @@ pub fn get_all_videos(conn: Connection) -> Result<Vec<VideoInfo>> {
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
-
+    println!("get_all_videos");
     Ok(videos)
 }
 

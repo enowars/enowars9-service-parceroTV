@@ -24,7 +24,7 @@ pub fn get_path(is_private: u32, title: &str, file: &NamedTempFile) -> String {
 }
 
 pub fn get_thumbnail_path(title: &str, file: &NamedTempFile) -> String {
-    let mut path = String::from("");
+    let mut path = String::from("thumbnails/");
     path.push_str(title);
     let md = read_metadata(title, file);
     path.push_str(&calculate_hash(&md).to_string());
@@ -60,7 +60,7 @@ pub fn save_video(path: &str, mut file: File) -> io::Result<()> {
 
 
 pub fn save_thumbnail(thumbnail_path: &str, mut thumbnail_file: File) -> io::Result<()> {
-    let mut data_path = String::from("../data/thumbnails/");
+    let mut data_path = String::from("../data/");
     data_path.push_str(thumbnail_path);
     let target_path = Path::new(&data_path);
 
