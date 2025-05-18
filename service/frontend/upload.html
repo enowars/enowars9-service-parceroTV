@@ -1,31 +1,37 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Home</title>
     <script src="/js/test.js"></script>
 </head>
+
 <body>
     <h1>Upload</h1>
     <form action="/app/create_video" method="post" enctype="multipart/form-data">
         <label for="name">Video Name:</label>
         <input type="text" id="name" name="name" required maxlength="20" /><br><br>
-      
+
         <label for="description">Description:</label><br>
         <textarea id="description" name="description" rows="5" cols="40" maxlength="1000" required></textarea><br><br>
-      
+
+        <label for="thumbnail">Thumbnail:</label>
+        <input type="file" id="thumbnail" name="thumbnail" accept="image/png" required /><br><br>
+
         <label for="file">Video File:</label>
         <input type="file" id="file" name="file" accept="video/*" required /><br><br>
-      
+
         <label for="is_private">Private:</label>
         <select id="is_private" name="is_private">
-          <option value="0">Public</option>
-          <option value="1">Private</option>
+            <option value="0">Public</option>
+            <option value="1">Private</option>
         </select><br><br>
-      
+
         <button type="submit">Upload Video</button>
-      </form>
-      
+    </form>
+
 </body>
+
 </html>

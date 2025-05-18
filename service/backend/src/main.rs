@@ -8,6 +8,8 @@ use actix_web::{
 };
 mod forms;
 use backend::get_path;
+use backend::get_thumbnail_path;
+use backend::save_thumbnail;
 use backend::save_video;
 use db::get_all_videos;
 use forms::{FormInput, VideoForm};
@@ -119,21 +121,31 @@ async fn videos(session: Session) -> Result<impl Responder, Error> {
     serve_file_or_reject(session, "../frontend/videos.html").await
 }
 
+#[get("/upload")]
+async fn upload_video_page(session: Session) -> Result<impl Responder, Error> {
+    serve_file_or_reject(session, "../frontend/upload.html").await
+}
+
+
 #[post("create_video")]
 async fn create_video(pool:web::Data<Pool>,session: Session, MultipartForm(video_form): MultipartForm<VideoForm>) -> Result<impl Responder, Error> {
     println!("We are here");
     if let Ok(Some(user_id)) = session.get::<u32>("user_id") {
         println!{"Video Form, Title {}, Desc.: {}, ",*video_form.name, *video_form.description};
         let file_to_save = video_form.file.file.reopen()?;
-        let path = get_path(*video_form.is_private, &video_form.name, video_form.file.file);
+        let thumbnail_to_save = video_form.thumbnail.file.reopen()?;
+        let path = get_path(*video_form.is_private, &video_form.name, &video_form.file.file);
+        let thumbnail_path = get_thumbnail_path(&video_form.name, &video_form.file.file);
+        let thumbnail_path_clone = thumbnail_path.clone();
         let path_clone = path.clone();
         
         let conn = get_db_conn(pool).await?;
 
-        let _ = web::block(move || insert_video(conn, &video_form.name, &video_form.description, &path, &user_id, &video_form.is_private))
+        let _ = web::block(move || insert_video(conn, &video_form.name, &video_form.description, &path, &thumbnail_path, &user_id, &video_form.is_private))
         .await?
         .map_err(error::ErrorInternalServerError);
 
+        save_thumbnail(&thumbnail_path_clone, thumbnail_to_save)?;
         save_video(&path_clone, file_to_save)?;
         Ok(HttpResponse::Ok().body("Video created!"))
     } else {
@@ -143,7 +155,7 @@ async fn create_video(pool:web::Data<Pool>,session: Session, MultipartForm(video
 
 //API
 #[get("/api/fetch_all_videos")]
-async fn fetch_all_videos(pool:web::Data<Pool>,session: Session,) -> Result<impl Responder, Error> {
+async fn fetch_all_videos(pool:web::Data<Pool>, session: Session,) -> Result<impl Responder, Error> {
     let conn = get_db_conn(pool).await?;
 
     let videoss = web::block(move || get_all_videos(conn)).await?.map_err(error::ErrorInternalServerError)?;
@@ -185,6 +197,7 @@ async fn main() -> std::io::Result<()> {
                     .service(profile)
                     .service(home)
                     .service(videos)
+                    .service(upload_video_page)
                     .service(create_video),
             )
             .service(fetch_all_videos)

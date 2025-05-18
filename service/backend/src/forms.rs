@@ -21,4 +21,5 @@ pub struct VideoForm {
     pub description: Text<String>,
     pub is_private: Text<u32>,
     pub file: TempFile,
+    pub thumbnail: TempFile,
 }
