@@ -91,6 +91,12 @@ async fn check_credentials(
     }
 }
 
+#[get("/logout")]
+async fn logout(session: Session) -> Result<impl Responder, Error> {
+    session.purge();
+    Ok(redirect!("/login"))
+}
+
 #[post("/newuser")]
 async fn newuser(
     pool: web::Data<Pool>,
@@ -331,6 +337,7 @@ async fn main() -> std::io::Result<()> {
             .service(fetch_all_videos)
             .service(no_permission)
             .service(get_video_info)
+            .service(logout)
             
     })
     .bind(("0.0.0.0", 8000))?
