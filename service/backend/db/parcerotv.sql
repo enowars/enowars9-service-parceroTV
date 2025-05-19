@@ -13,6 +13,7 @@ CREATE TABLE videos(
     thumbnail_path TEXT NOT NULL,
     UserID INTEGER,
     is_private INTEGER NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY (UserID) REFERENCES users(UserID) ON DELETE CASCADE
 );
 
@@ -21,6 +22,7 @@ CREATE TABLE comments(
     comment TEXT NOT NULL,
     UserID INTEGER NOT NULL,
     VideoID INTEGER NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY (UserID) REFERENCES users(UserID) ON DELETE CASCADE,
     FOREIGN KEY (VideoID) REFERENCES videos(VideoID) ON DELETE CASCADE
 );
