@@ -18,6 +18,7 @@ use backend::save_video;
 use db::create_comment;
 use db::get_all_videos;
 use db::is_video_private;
+use db::select_user_id;
 use db::select_video_by_path;
 use db::user_has_permission;
 use forms::{CommentForm, FormInput, VideoForm};
@@ -64,17 +65,26 @@ async fn check_credentials(
     session: Session,
 ) -> Result<impl Responder, Error> {
     let form = form.into_inner();
-    let conn = get_db_conn(pool).await?;
+    let conn = get_db_conn(&pool).await?;
     let name = form.username.clone();
+    let name_clone = name.clone();
     let typed_password = form.password.clone();
     println!("{name} {typed_password}");
-    let password = web::block(move || select_password(conn, &name))
+    let maybe_password = web::block(move || select_password(conn, &name))
         .await?
         .map_err(error::ErrorInternalServerError)?;
 
-    println!("{password} und {typed_password}");
+    let password = match maybe_password {
+        Some(password) => password,
+        None => return Ok(HttpResponse::Ok().body("User not auth!")),
+    };
+
     if (password == typed_password) {
-        session.insert("user_id", 1).unwrap();
+        let conn = get_db_conn(&pool).await?;
+        let user_id = web::block(move || select_user_id(conn, &name_clone))
+        .await?
+        .map_err(error::ErrorInternalServerError)?;
+        session.insert("user_id", user_id).unwrap();
         return Ok(redirect!("/app/home"));
     } else {
         return Ok(HttpResponse::Ok().body("User not auth!"));
@@ -87,7 +97,7 @@ async fn newuser(
     form: web::Form<FormInput>,
 ) -> Result<impl Responder, Error> {
     let form = form.into_inner();
-    let conn = get_db_conn(pool).await?;
+    let conn = get_db_conn(&pool).await?;
     let name = form.username.clone();
     let password = form.password.clone();
     println!("{name} {password}");
@@ -142,7 +152,7 @@ async fn private_videos(req: HttpRequest,
     path: web::Path<String>,
 ) -> Result<impl Responder, Error> {
     if let Ok(Some(user_id)) = session.get::<i32>("user_id") {
-        let conn = get_db_conn(pool).await?;
+        let conn = get_db_conn(&pool).await?;
         let path = path.into_inner();
         let private_path = format!("private/{}", path);
         let path_clone = private_path.clone();
@@ -152,7 +162,7 @@ async fn private_videos(req: HttpRequest,
 
         println!("Has permission {} for user {} with path {}", &has_permission, &user_id, &path_clone);
         if !has_permission {
-            return Ok(redirect!("/no_permission"));
+            return Ok(HttpResponse::Unauthorized().body("You have no permission to see this video"));
         }
         let file_path = PathBuf::from(format!("../data/{}", path_clone));
         return Ok(NamedFile::open(file_path)?.into_response(&req));
@@ -181,7 +191,7 @@ async fn create_video(
         let thumbnail_path_clone = thumbnail_path.clone();
         let path_clone = path.clone();
 
-        let conn = get_db_conn(pool).await?;
+        let conn = get_db_conn(&pool).await?;
 
         let _ = web::block(move || {
             insert_video(
@@ -212,7 +222,7 @@ async fn post_comment(
     form: web::Form<CommentForm>,
 ) -> Result<impl Responder, Error> {
     if let Ok(Some(user_id)) = session.get::<i32>("user_id") {
-        let conn = get_db_conn(pool).await?;
+        let conn = get_db_conn(&pool).await?;
         let comment_form = form.into_inner();
         let is_private =
             is_video_private(&conn, &comment_form.video_id).map_err(ErrorInternalServerError)?;
@@ -243,7 +253,7 @@ async fn fetch_all_videos(
 ) -> Result<impl Responder, Error> {
     println!("/api/fetch_all_videos");
     if let Ok(Some(_user_id)) = session.get::<i32>("user_id") {
-        let conn = get_db_conn(pool).await?;
+        let conn = get_db_conn(&pool).await?;
 
         let videoss = web::block(move || get_all_videos(conn))
             .await?
@@ -262,7 +272,7 @@ async fn get_video_info(
 ) -> Result<impl Responder, Error> {
     println!("/get_video_info/{}", &path);
     if let Ok(Some(user_id)) = session.get::<i32>("user_id") {
-        let conn = get_db_conn(pool).await?;
+        let conn = get_db_conn(&pool).await?;
         let has_permission =
             user_has_permission(&conn, &user_id, &path).map_err(ErrorInternalServerError)?;
         if !has_permission {

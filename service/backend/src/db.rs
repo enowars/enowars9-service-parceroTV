@@ -1,13 +1,13 @@
 use std::{thread::sleep, time::Duration};
 
 use actix_web::{error, web, Error};
-use rusqlite::{Statement, Result, params};
+use rusqlite::{params, OptionalExtension, Result, Statement};
 use serde::{Deserialize, Serialize};
 
 pub type Pool = r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>;
 pub type Connection = r2d2::PooledConnection<r2d2_sqlite::SqliteConnectionManager>;
 
-pub async fn get_db_conn(pool: web::Data<Pool>) -> Result<Connection, Error> {
+pub async fn get_db_conn(pool: &web::Data<Pool>) -> Result<Connection, Error> {
     let pool = pool.clone();
     web::block(move || pool.get())
         .await?
@@ -25,7 +25,7 @@ pub fn create_user(conn: Connection, name: &str, password: &str) -> Result<()> {
 }
 
 pub fn get_all_videos(conn: Connection) -> Result<Vec<VideoInfo>> {
-    let mut stmt = conn.prepare("SELECT videoid, name, description, thumbnail_path, path FROM videos WHERE is_private = 0")?;
+    let mut stmt = conn.prepare("SELECT videoid, name, description, thumbnail_path, path, is_private FROM videos WHERE is_private = 0")?;
 
     let videos = stmt
         .query_map([], |row| {
@@ -35,6 +35,7 @@ pub fn get_all_videos(conn: Connection) -> Result<Vec<VideoInfo>> {
                 description: row.get(2)?,
                 thumbnail_path: row.get(3)?,
                 path: row.get(4)?,
+                is_private: row.get(5)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -43,7 +44,7 @@ pub fn get_all_videos(conn: Connection) -> Result<Vec<VideoInfo>> {
 }
 
 pub fn select_video_by_path(conn: Connection, path: &str) -> Result<VideoInfo> {
-    let mut stmt = conn.prepare("SELECT VideoId, name, description, thumbnail_path, path FROM videos WHERE path = (?1) ORDER BY videoID LIMIT 1")?;
+    let mut stmt = conn.prepare("SELECT VideoId, name, description, thumbnail_path, path, is_private FROM videos WHERE path = (?1) ORDER BY videoID LIMIT 1")?;
     let video: VideoInfo = stmt.query_row(
     params![&path],
     |row| {
@@ -53,6 +54,7 @@ pub fn select_video_by_path(conn: Connection, path: &str) -> Result<VideoInfo> {
             description: row.get(2)?,
             thumbnail_path: row.get(3)?,
             path: row.get(4)?,
+            is_private: row.get(5)?,
         })
     })?;
     Ok(video)
@@ -72,13 +74,25 @@ pub fn user_has_permission(conn: &Connection, user_id: &i32, path: &str) -> Resu
     }
 }
 
-pub fn select_password(conn:Connection, name: &str) -> Result<String> {
-    let password:String = conn.query_row(
-        "SELECT password FROM users WHERE name = (?1)",
+pub fn select_user_id(conn: Connection, name: &str) -> Result<i32> {
+    let user_id: i32 = conn.query_row(
+        "SELECT UserID FROM users WHERE name = (?1)",
         params![name],
         |row| row.get(0),
     )?;
-    println!("{name}{password}");
+    
+    println!("User '{}' has ID {}", name, user_id);
+    Ok(user_id)
+}
+
+
+pub fn select_password(conn:Connection, name: &str) -> Result<Option<String>> {
+    let password = conn.query_row(
+        "SELECT password FROM users WHERE name = (?1)",
+        params![name],
+        |row| row.get(0),
+    ).optional()?;
+    println!("{name}");
     Ok(password)
 }
 
@@ -127,4 +141,5 @@ pub struct VideoInfo{
     pub description: String,
     pub thumbnail_path: String,
     pub path: String,
+    pub is_private: i32,
 }

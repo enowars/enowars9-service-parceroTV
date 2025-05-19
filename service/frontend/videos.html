@@ -15,9 +15,9 @@
   </video>
   <div class="comment-box">
     <p id="description"></p>
-    <h4>Leave a Comment</h4>
+    <h4 id="commentHeader">Leave a Comment</h4>
     <form action="/post_comment" method="post" id="commentForm">
-        <input type="hidden" name="video_id" value="123">
+        <input type="hidden" id="videoID" name="video_id" value="">
       <textarea id="commentText" rows="4" placeholder="Write your comment here..." required></textarea>
       <br>
       <button type="submit">Post Comment</button>

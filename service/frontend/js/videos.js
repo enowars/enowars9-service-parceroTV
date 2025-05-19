@@ -4,14 +4,40 @@ document.addEventListener("DOMContentLoaded", function () {
     const video_id = params.get("id")
 
     async function getVideoInfo(path) {
-        const res = await fetch("/get_video_info/"+path);
-        const videoInfo = await res.json();
+        try {
+            const res = await fetch("/get_video_info/" + path);
+            const videoInfo = await res.json();
 
-        document.getElementById("name").innerText = videoInfo.name || "Untitled";
-        document.getElementById("description").innerText = videoInfo.description || "";
+            if (videoInfo) {
+                document.getElementById("name").innerText = videoInfo.name || "Untitled";
+                document.getElementById("description").innerText = videoInfo.description || "";
+
+                if (videoInfo.is_private == 1) {
+                    const form = document.getElementById("commentForm");
+                    if (form) form.remove();
+                }
+            } else {
+                console.warn("videoInfo is null or undefined");
+            }
+
+            if (videoInfo.is_private) {
+                document.getElementById("commentHeader").remove();
+                const form = document.getElementById("commentForm");
+                if (form) form.remove();
+            }
+        }
+        catch {
+            const header = document.getElementById("commentHeader").remove();
+            const form = document.getElementById("commentForm");
+            if (form) form.remove();
+        }
+
     }
 
     getVideoInfo(filename);
+    if (video_id) {
+        document.getElementById("videoID").setAttribute('value', video_id);
+    }
     if (filename) {
         const source = document.getElementById("video-source");
         source.src = `${filename}`;
