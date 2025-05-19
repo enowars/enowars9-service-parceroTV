@@ -45,7 +45,7 @@ pub fn get_all_videos(conn: Connection) -> Result<Vec<VideoInfo>> {
 pub fn select_video_by_path(conn: Connection, path: &str) -> Result<VideoInfo> {
     let mut stmt = conn.prepare("SELECT VideoId, name, description, thumbnail_path, path FROM videos WHERE path = (?1) ORDER BY videoID LIMIT 1")?;
     let video: VideoInfo = stmt.query_row(
-    params![path],
+    params![&path],
     |row| {
         Ok(VideoInfo {
             id: row.get(0)?,

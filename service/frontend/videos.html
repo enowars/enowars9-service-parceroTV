@@ -4,15 +4,17 @@
   <meta charset="UTF-8">
   <title>Watch Video</title>
   <script src="/js/videos.js"></script>
+  <base href="/" />
 </head>
 <body>
-  <h1>Now Playing:</h1>
+  <h1 id="name"></h1>
 
   <video id="video-player" width="720" controls>
     <source id="video-source" src="" type="video/mp4">
     Your browser does not support the video tag.
   </video>
   <div class="comment-box">
+    <p id="description"></p>
     <h4>Leave a Comment</h4>
     <form action="/post_comment" method="post" id="commentForm">
         <input type="hidden" name="video_id" value="123">

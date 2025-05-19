@@ -1,9 +1,12 @@
 use std::io::Write;
+use std::path;
+use std::path::PathBuf;
 
 use actix_files::Files;
 use actix_files::NamedFile;
 use actix_multipart::form::MultipartForm;
 use actix_web::error::ErrorInternalServerError;
+use actix_web::HttpRequest;
 use actix_web::{
     App, Error, HttpResponse, HttpServer, Responder, error, get, middleware, post, web,
 };
@@ -132,20 +135,27 @@ async fn no_permission(session: Session) -> Result<impl Responder, Error> {
     serve_file_or_reject(session, "../frontend/no_permission.html").await
 }
 
-#[get("/private/{path}")]
-async fn private_videos(
+#[get("/private/{path:.*}")]
+async fn private_videos(req: HttpRequest,
     session: Session,
     pool: web::Data<Pool>,
     path: web::Path<String>,
 ) -> Result<impl Responder, Error> {
     if let Ok(Some(user_id)) = session.get::<i32>("user_id") {
         let conn = get_db_conn(pool).await?;
-        let has_permission =
-            user_has_permission(&conn, &user_id, &path).map_err(ErrorInternalServerError)?;
+        let path = path.into_inner();
+        let private_path = format!("private/{}", path);
+        let path_clone = private_path.clone();
+        let has_permission = web::block(move || user_has_permission(&conn, &user_id, &private_path))
+            .await?
+            .map_err(ErrorInternalServerError)?;
+
+        println!("Has permission {} for user {} with path {}", &has_permission, &user_id, &path_clone);
         if !has_permission {
             return Ok(redirect!("/no_permission"));
         }
-        return Ok(HttpResponse::Ok().finish());
+        let file_path = PathBuf::from(format!("../data/{}", path_clone));
+        return Ok(NamedFile::open(file_path)?.into_response(&req));
     } else {
         Ok(HttpResponse::Unauthorized().body("Please log in"))
     }
@@ -244,12 +254,13 @@ async fn fetch_all_videos(
     }
 }
 
-#[get("/get_video_info/{path}")]
+#[get("/get_video_info/{path:.*}")]
 async fn get_video_info(
     pool: web::Data<Pool>,
     session: Session,
     path: web::Path<String>,
 ) -> Result<impl Responder, Error> {
+    println!("/get_video_info/{}", &path);
     if let Ok(Some(user_id)) = session.get::<i32>("user_id") {
         let conn = get_db_conn(pool).await?;
         let has_permission =
@@ -292,13 +303,13 @@ async fn main() -> std::io::Result<()> {
             .route("/hey", web::get().to(manual_hello))
             .service(newuser)
             .service(check_credentials)
+            .service(private_videos)
             .service(Files::new("/login", "../frontend").index_file("login.html"))
             .service(Files::new("/register", "../frontend").index_file("register.html"))
             .service(Files::new("/js", "../frontend/js/").show_files_listing())
             .service(Files::new("/css", "../frontend/css/"))
             .service(Files::new("/videos", "../data/videos/").show_files_listing())
             .service(Files::new("/thumbnails", "../data/thumbnails/").show_files_listing())
-            .service(Files::new("/private", "../data/private/").show_files_listing())
             .service(
                 web::scope("/app")
                     .service(profile)
@@ -309,6 +320,8 @@ async fn main() -> std::io::Result<()> {
             )
             .service(fetch_all_videos)
             .service(no_permission)
+            .service(get_video_info)
+            
     })
     .bind(("0.0.0.0", 8000))?
     .run()
