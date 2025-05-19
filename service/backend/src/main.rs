@@ -15,6 +15,8 @@ use backend::save_video;
 use db::create_comment;
 use db::get_all_videos;
 use db::is_video_private;
+use db::select_video_by_path;
+use db::user_has_permission;
 use forms::{CommentForm, FormInput, VideoForm};
 
 use r2d2_sqlite::SqliteConnectionManager;
@@ -130,6 +132,25 @@ async fn no_permission(session: Session) -> Result<impl Responder, Error> {
     serve_file_or_reject(session, "../frontend/no_permission.html").await
 }
 
+#[get("/private/{path}")]
+async fn private_videos(
+    session: Session,
+    pool: web::Data<Pool>,
+    path: web::Path<String>,
+) -> Result<impl Responder, Error> {
+    if let Ok(Some(user_id)) = session.get::<i32>("user_id") {
+        let conn = get_db_conn(pool).await?;
+        let has_permission =
+            user_has_permission(&conn, &user_id, &path).map_err(ErrorInternalServerError)?;
+        if !has_permission {
+            return Ok(redirect!("/no_permission"));
+        }
+        return Ok(HttpResponse::Ok().finish());
+    } else {
+        Ok(HttpResponse::Unauthorized().body("Please log in"))
+    }
+}
+
 #[post("create_video")]
 async fn create_video(
     pool: web::Data<Pool>,
@@ -218,6 +239,29 @@ async fn fetch_all_videos(
             .await?
             .map_err(error::ErrorInternalServerError)?;
         Ok(HttpResponse::Ok().json(videoss))
+    } else {
+        Ok(HttpResponse::Unauthorized().body("Please log in"))
+    }
+}
+
+#[get("/get_video_info/{path}")]
+async fn get_video_info(
+    pool: web::Data<Pool>,
+    session: Session,
+    path: web::Path<String>,
+) -> Result<impl Responder, Error> {
+    if let Ok(Some(user_id)) = session.get::<i32>("user_id") {
+        let conn = get_db_conn(pool).await?;
+        let has_permission =
+            user_has_permission(&conn, &user_id, &path).map_err(ErrorInternalServerError)?;
+        if !has_permission {
+            return Ok(redirect!("/no_permission"));
+        } else {
+            let video_info = web::block(move || select_video_by_path(conn, &path))
+                .await?
+                .map_err(error::ErrorInternalServerError)?;
+            Ok(HttpResponse::Ok().json(video_info))
+        }
     } else {
         Ok(HttpResponse::Unauthorized().body("Please log in"))
     }
