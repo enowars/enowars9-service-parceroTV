@@ -5,8 +5,8 @@ use std::path::PathBuf;
 use actix_files::Files;
 use actix_files::NamedFile;
 use actix_multipart::form::MultipartForm;
-use actix_web::error::ErrorInternalServerError;
 use actix_web::HttpRequest;
+use actix_web::error::ErrorInternalServerError;
 use actix_web::{
     App, Error, HttpResponse, HttpServer, Responder, error, get, middleware, post, web,
 };
@@ -19,8 +19,12 @@ use db::create_comment;
 use db::get_all_videos;
 use db::is_video_private;
 use db::select_user_id;
+use db::select_user_info;
 use db::select_video_by_path;
+use db::select_videos_by_userid;
+use db::update_about_user;
 use db::user_has_permission;
+use forms::UpdateAboutForm;
 use forms::{CommentForm, FormInput, VideoForm};
 
 use r2d2_sqlite::SqliteConnectionManager;
@@ -82,8 +86,8 @@ async fn check_credentials(
     if (password == typed_password) {
         let conn = get_db_conn(&pool).await?;
         let user_id = web::block(move || select_user_id(conn, &name_clone))
-        .await?
-        .map_err(error::ErrorInternalServerError)?;
+            .await?
+            .map_err(error::ErrorInternalServerError)?;
         session.insert("user_id", user_id).unwrap();
         return Ok(redirect!("/app/home"));
     } else {
@@ -126,7 +130,7 @@ async fn serve_file_or_reject(session: Session, path: &str) -> Result<impl Respo
     }
 }
 
-#[get("/profile")]
+#[get("/myprofile")]
 async fn profile(session: Session) -> Result<impl Responder, Error> {
     serve_file_or_reject(session, "../frontend/profile.html").await
 }
@@ -146,13 +150,19 @@ async fn upload_video_page(session: Session) -> Result<impl Responder, Error> {
     serve_file_or_reject(session, "../frontend/upload.html").await
 }
 
+#[get("/users")]
+async fn users(session: Session) -> Result<impl Responder, Error> {
+    serve_file_or_reject(session, "../frontend/users.html").await
+}
+
 #[get("/no_permission")]
 async fn no_permission(session: Session) -> Result<impl Responder, Error> {
     serve_file_or_reject(session, "../frontend/no_permission.html").await
 }
 
 #[get("/private/{path:.*}")]
-async fn private_videos(req: HttpRequest,
+async fn private_videos(
+    req: HttpRequest,
     session: Session,
     pool: web::Data<Pool>,
     path: web::Path<String>,
@@ -162,13 +172,19 @@ async fn private_videos(req: HttpRequest,
         let path = path.into_inner();
         let private_path = format!("private/{}", path);
         let path_clone = private_path.clone();
-        let has_permission = web::block(move || user_has_permission(&conn, &user_id, &private_path))
-            .await?
-            .map_err(ErrorInternalServerError)?;
+        let has_permission =
+            web::block(move || user_has_permission(&conn, &user_id, &private_path))
+                .await?
+                .map_err(ErrorInternalServerError)?;
 
-        println!("Has permission {} for user {} with path {}", &has_permission, &user_id, &path_clone);
+        println!(
+            "Has permission {} for user {} with path {}",
+            &has_permission, &user_id, &path_clone
+        );
         if !has_permission {
-            return Ok(HttpResponse::Unauthorized().body("You have no permission to see this video"));
+            return Ok(
+                HttpResponse::Unauthorized().body("You have no permission to see this video")
+            );
         }
         let file_path = PathBuf::from(format!("../data/{}", path_clone));
         return Ok(NamedFile::open(file_path)?.into_response(&req));
@@ -271,6 +287,44 @@ async fn fetch_all_videos(
     }
 }
 
+#[get("/get_videos/{user_id}")]
+async fn get_videos_by_userid(
+    pool: web::Data<Pool>,
+    session: Session,
+    user_id: web::Path<i32>
+) -> Result<impl Responder, Error> {
+    println!("/api/fetch_all_videos");
+    if let Ok(Some(_user_id)) = session.get::<i32>("user_id") {
+        let conn = get_db_conn(&pool).await?;
+        let user_id = user_id.into_inner();
+        let videoss = web::block(move || select_videos_by_userid(conn, user_id))
+            .await?
+            .map_err(error::ErrorInternalServerError)?;
+        Ok(HttpResponse::Ok().json(videoss))
+    } else {
+        Ok(HttpResponse::Unauthorized().body("Please log in"))
+    }
+}
+
+#[get("/get_user_info/{id}")]
+async fn get_user_info(
+    pool: web::Data<Pool>,
+    session: Session,
+    id: web::Path<i32>,
+) -> Result<impl Responder, Error> {
+    println!("User info called");
+    if let Ok(Some(_user_id)) = session.get::<i32>("user_id") {
+        let conn = get_db_conn(&pool).await?;
+        let id = id.into_inner();
+        let user_info = web::block(move || select_user_info(conn, &id))
+            .await?
+            .map_err(error::ErrorInternalServerError)?;
+        Ok(HttpResponse::Ok().json(user_info))
+    } else {
+        Ok(HttpResponse::Unauthorized().body("Please log in"))
+    }
+}
+
 #[get("/get_video_info/{path:.*}")]
 async fn get_video_info(
     pool: web::Data<Pool>,
@@ -283,8 +337,7 @@ async fn get_video_info(
         let has_permission = if path.starts_with("videos/") {
             true
         } else {
-            user_has_permission(&conn, &user_id, &path)
-                .map_err(ErrorInternalServerError)?
+            user_has_permission(&conn, &user_id, &path).map_err(ErrorInternalServerError)?
         };
         if !has_permission {
             return Ok(redirect!("/no_permission"));
@@ -297,6 +350,35 @@ async fn get_video_info(
     } else {
         Ok(HttpResponse::Unauthorized().body("Please log in"))
     }
+}
+
+#[get("/get_my_profile")]
+async fn get_my_profile(session: Session, pool: web::Data<Pool>) -> Result<impl Responder, Error> {
+    if let Ok(Some(user_id)) = session.get::<i32>("user_id") {
+        let conn = get_db_conn(&pool).await?;
+        let user_info = web::block(move || select_user_info(conn, &user_id))
+            .await?
+            .map_err(error::ErrorInternalServerError)?;
+        Ok(HttpResponse::Ok().json(user_info))
+    }
+        else {
+            Ok(HttpResponse::Unauthorized().body("Please log in"))
+        }
+}
+
+#[post("/update_about")]
+async fn update_about(session: Session, pool: web::Data<Pool>, aboutform:web::Form<UpdateAboutForm>) -> Result<impl Responder, Error> {
+    if let Ok(Some(user_id)) = session.get::<i32>("user_id") {
+        let about = aboutform.into_inner().about;
+        let conn = get_db_conn(&pool).await?;
+        let _ = web::block(move || update_about_user(conn, &about, &user_id))
+            .await?
+            .map_err(error::ErrorInternalServerError)?;
+        Ok(redirect!("app/myprofile"))
+    }
+        else {
+            Ok(HttpResponse::Unauthorized().body("Please log in"))
+        }
 }
 
 fn session_middleware() -> SessionMiddleware<CookieSessionStore> {
@@ -337,13 +419,17 @@ async fn main() -> std::io::Result<()> {
                     .service(home)
                     .service(videos)
                     .service(upload_video_page)
-                    .service(create_video),
+                    .service(create_video)
+                    .service(users),
             )
             .service(fetch_all_videos)
             .service(no_permission)
             .service(get_video_info)
             .service(logout)
-            
+            .service(get_user_info)
+            .service(get_my_profile)
+            .service(update_about)
+            .service(get_videos_by_userid)
     })
     .bind(("0.0.0.0", 8000))?
     .run()

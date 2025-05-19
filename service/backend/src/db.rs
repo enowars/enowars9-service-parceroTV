@@ -26,7 +26,7 @@ pub fn create_user(conn: Connection, name: &str, password: &str) -> Result<()> {
 }
 
 pub fn get_all_videos(conn: Connection) -> Result<Vec<VideoInfo>> {
-    let mut stmt = conn.prepare("SELECT videoid, name, description, thumbnail_path, path, is_private, location FROM videos WHERE is_private = 0")?;
+    let mut stmt = conn.prepare("SELECT videoid, name, description, thumbnail_path, path, is_private, location, userId FROM videos WHERE is_private = 0")?;
 
     let videos = stmt
         .query_map([], |row| {
@@ -38,6 +38,28 @@ pub fn get_all_videos(conn: Connection) -> Result<Vec<VideoInfo>> {
                 path: row.get(4)?,
                 is_private: row.get(5)?,
                 location: row.get(6)?,
+                userId: row.get(7)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    println!("get_all_videos");
+    Ok(videos)
+}
+
+pub fn select_videos_by_userid(conn: Connection, user_id: i32) -> Result<Vec<VideoInfo>> {
+    let mut stmt = conn.prepare("SELECT videoid, name, description, thumbnail_path, path, is_private, location, userId FROM videos WHERE is_private = 0 AND userid = ?1")?;
+
+    let videos = stmt
+        .query_map([user_id], |row| {
+            Ok(VideoInfo {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                description: row.get(2)?,
+                thumbnail_path: row.get(3)?,
+                path: row.get(4)?,
+                is_private: row.get(5)?,
+                location: row.get(6)?,
+                userId: row.get(7)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -46,7 +68,7 @@ pub fn get_all_videos(conn: Connection) -> Result<Vec<VideoInfo>> {
 }
 
 pub fn select_video_by_path(conn: Connection, path: &str) -> Result<VideoInfo> {
-    let mut stmt = conn.prepare("SELECT VideoId, name, description, thumbnail_path, path, is_private, location FROM videos WHERE path = (?1) ORDER BY videoID LIMIT 1")?;
+    let mut stmt = conn.prepare("SELECT VideoId, name, description, thumbnail_path, path, is_private, location, userID FROM videos WHERE path = (?1) ORDER BY videoID LIMIT 1")?;
     let video: VideoInfo = stmt.query_row(
     params![&path],
     |row| {
@@ -58,6 +80,7 @@ pub fn select_video_by_path(conn: Connection, path: &str) -> Result<VideoInfo> {
             path: row.get(4)?,
             is_private: row.get(5)?,
             location: row.get(6)?,
+            userId: row.get(7)?,
         })
     })?;
     Ok(video)
@@ -88,6 +111,20 @@ pub fn select_user_id(conn: Connection, name: &str) -> Result<i32> {
     Ok(user_id)
 }
 
+pub fn select_user_info(conn: Connection, id: &i32) -> Result<UserInfo> {
+    let user_info = conn.query_row(
+        "SELECT UserID, name, about FROM users WHERE userID = (?1)",
+        params![id],
+        |row| {
+            Ok(UserInfo {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                about: row.get(2)?,
+            })},
+    )?;
+    
+    Ok(user_info)
+}
 
 pub fn select_password(conn:Connection, name: &str) -> Result<Option<String>> {
     let password = conn.query_row(
@@ -100,10 +137,10 @@ pub fn select_password(conn:Connection, name: &str) -> Result<Option<String>> {
 }
 
 
-pub fn update_about_user(conn: Connection, about:&str, name:&str) -> Result<()> {
+pub fn update_about_user(conn: Connection, about:&str, user_id: &i32) -> Result<()> {
     conn.execute(
-        "UPDATE users SET about = (?1) WHERE name = (?2)",
-        (about, name),
+        "UPDATE users SET about = (?1) WHERE userID = (?2)",
+        (about, user_id),
     )?;
     Ok(())
 }
@@ -146,4 +183,12 @@ pub struct VideoInfo{
     pub path: String,
     pub is_private: i32,
     pub location: String,
+    pub userId: i32,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct UserInfo{
+    pub id: i32,
+    pub name: String,
+    pub about: Option<String>,
 }

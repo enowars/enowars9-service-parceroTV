@@ -13,6 +13,10 @@ pub struct CommentForm {
     pub video_id: i32,
 }
 
+#[derive(Deserialize)]
+pub struct UpdateAboutForm {
+    pub about: String,
+}
 
 #[derive(Debug, Deserialize)]
 pub struct VideoInfo {

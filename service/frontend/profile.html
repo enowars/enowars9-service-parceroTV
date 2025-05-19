@@ -3,10 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login</title>
-    <script src="/js/test.js"></script>
+    <title>My Profile</title>
+    <script src="/js/profile.js"></script>
 </head>
 <body>
-    <h1>Profile</h1>
+    <h1>Profile of <span id="name"></span></h1>
+    <form action="/update_about" method="post">
+        <label for="about">Update your About section:</label><br><br>
+      
+        <textarea id="about" name="about" rows="6" cols="50" placeholder="Tell us something about yourself..." required></textarea><br><br>
+      
+        <button type="submit">Save Changes</button>
+      </form>
 </body>
 </html>
