@@ -16,6 +16,7 @@
 
     <script>
         async function loadVideos() {
+            try{
             const res = await fetch("/api/fetch_all_videos");
             const videos = await res.json();
 
@@ -30,33 +31,28 @@
                 img.alt = video.name;
                 img.style.width = "200px";
 
+                const link = document.createElement("a");
                 const h3 = document.createElement("h3");
                 h3.textContent = video.name;
+                link.appendChild(h3);
+                link.setAttribute("href", "app/videos?file="+video.path+"&id="+video.id)
 
                 const p = document.createElement("p");
                 p.textContent = video.description;
 
-                const videoEl = document.createElement("video");
-                videoEl.width = 320;
-                videoEl.controls = true;
-
-                const source = document.createElement("source");
-                source.src = video.path;
-                source.type = "video/mp4";
-
-                videoEl.appendChild(source);
-
                 const hr = document.createElement("hr");
 
                 div.appendChild(img);
-                div.appendChild(h3);
+                div.appendChild(link);
                 div.appendChild(p);
-                div.appendChild(videoEl);
                 div.appendChild(hr);
 
                 container.appendChild(div);
             });
-
+        }
+        catch {
+            console.log("Error Fetching Videos");
+        }
         }
 
         loadVideos();

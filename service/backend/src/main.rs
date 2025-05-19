@@ -279,8 +279,12 @@ async fn get_video_info(
     println!("/get_video_info/{}", &path);
     if let Ok(Some(user_id)) = session.get::<i32>("user_id") {
         let conn = get_db_conn(&pool).await?;
-        let has_permission =
-            user_has_permission(&conn, &user_id, &path).map_err(ErrorInternalServerError)?;
+        let has_permission = if path.starts_with("videos/") {
+            true
+        } else {
+            user_has_permission(&conn, &user_id, &path)
+                .map_err(ErrorInternalServerError)?
+        };
         if !has_permission {
             return Ok(redirect!("/no_permission"));
         } else {
