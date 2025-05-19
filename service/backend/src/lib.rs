@@ -91,18 +91,16 @@ fn calculate_hash<T: Hash>(t: &T) -> u64 {
 #[derive(Debug, Hash)]
 pub struct VideoMetadata {
     pub title: String,
-    pub duration: String,
-    pub info: String,
-    pub creation_time: String,
+    pub creator: String,
+    pub location: String,
 }
 
 pub fn read_metadata(title: &str, file: &NamedTempFile) -> VideoMetadata {
     ffmpeg::init().unwrap();
 
     let path = file.path().to_str().unwrap();
-    let mut info = String::new();
-    let mut duration = String::from("unknown");
-    let mut creation_time = String::from("unknown");
+    let mut location = String::from("unknown");
+    let mut creator = String::from("unknown");
     let mut title_override = title.to_string();
 
     match ffmpeg::format::input(path) {
@@ -110,9 +108,8 @@ pub fn read_metadata(title: &str, file: &NamedTempFile) -> VideoMetadata {
             for (k, v) in context.metadata().iter() {
                 match k.to_lowercase().as_str() {
                     "title" => title_override = v.to_string(),
-                    "duration" => duration = v.to_string(),
-                    "info" => info = v.to_string(),
-                    "creation_time" => creation_time = v.to_string(),
+                    "creator" => creator = v.to_string(),
+                    "location" => location = v.to_string(),
                     _ => {},
                 }
             }
@@ -123,9 +120,8 @@ pub fn read_metadata(title: &str, file: &NamedTempFile) -> VideoMetadata {
 
     VideoMetadata {
         title: title_override,
-        duration,
-        info,
-        creation_time,
+        creator,
+        location,
     }
 }
 
@@ -133,5 +129,5 @@ pub fn read_metadata(title: &str, file: &NamedTempFile) -> VideoMetadata {
 
 //Debug Function
 fn print_md(md :&VideoMetadata) {
-    println!("title: {} \nduration: {} \ninfo: {} \ncreation_time: {} \n", md.title, md.duration, md.info, md.creation_time)
+    println!("title: {} \ncreators: {} \nlocation: {} \n", md.title, md.creator, md.location)
 }

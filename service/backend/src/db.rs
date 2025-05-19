@@ -1,6 +1,7 @@
 use std::{thread::sleep, time::Duration};
 
 use actix_web::{error, web, Error};
+use ffmpeg_next::chroma::location;
 use rusqlite::{params, OptionalExtension, Result, Statement};
 use serde::{Deserialize, Serialize};
 
@@ -25,7 +26,7 @@ pub fn create_user(conn: Connection, name: &str, password: &str) -> Result<()> {
 }
 
 pub fn get_all_videos(conn: Connection) -> Result<Vec<VideoInfo>> {
-    let mut stmt = conn.prepare("SELECT videoid, name, description, thumbnail_path, path, is_private FROM videos WHERE is_private = 0")?;
+    let mut stmt = conn.prepare("SELECT videoid, name, description, thumbnail_path, path, is_private, location FROM videos WHERE is_private = 0")?;
 
     let videos = stmt
         .query_map([], |row| {
@@ -36,6 +37,7 @@ pub fn get_all_videos(conn: Connection) -> Result<Vec<VideoInfo>> {
                 thumbnail_path: row.get(3)?,
                 path: row.get(4)?,
                 is_private: row.get(5)?,
+                location: row.get(6)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -44,7 +46,7 @@ pub fn get_all_videos(conn: Connection) -> Result<Vec<VideoInfo>> {
 }
 
 pub fn select_video_by_path(conn: Connection, path: &str) -> Result<VideoInfo> {
-    let mut stmt = conn.prepare("SELECT VideoId, name, description, thumbnail_path, path, is_private FROM videos WHERE path = (?1) ORDER BY videoID LIMIT 1")?;
+    let mut stmt = conn.prepare("SELECT VideoId, name, description, thumbnail_path, path, is_private, location FROM videos WHERE path = (?1) ORDER BY videoID LIMIT 1")?;
     let video: VideoInfo = stmt.query_row(
     params![&path],
     |row| {
@@ -55,6 +57,7 @@ pub fn select_video_by_path(conn: Connection, path: &str) -> Result<VideoInfo> {
             thumbnail_path: row.get(3)?,
             path: row.get(4)?,
             is_private: row.get(5)?,
+            location: row.get(6)?,
         })
     })?;
     Ok(video)
@@ -107,11 +110,11 @@ pub fn update_about_user(conn: Connection, about:&str, name:&str) -> Result<()> 
 
 
 
-pub fn insert_video(conn: Connection, name:&str, description: &str, path: &str, thumbnail_path:&str, user_id: &u32, is_private: &u32) -> Result<()> {
+pub fn insert_video(conn: Connection, name:&str, description: &str, path: &str, thumbnail_path:&str, user_id: &u32, is_private: &u32, location: &str) -> Result<()> {
     println!("Insert {} {} {}", name, description, path);
     conn.execute(
-        "INSERT INTO videos (name, description, path, thumbnail_path, UserID, is_private) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        (name, description, path, thumbnail_path, user_id, is_private)
+        "INSERT INTO videos (name, description, path, thumbnail_path, UserID, is_private, location) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        (name, description, path, thumbnail_path, user_id, is_private, location)
     )?;
     
     Ok(())
@@ -142,4 +145,5 @@ pub struct VideoInfo{
     pub thumbnail_path: String,
     pub path: String,
     pub is_private: i32,
+    pub location: String,
 }

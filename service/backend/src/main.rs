@@ -208,6 +208,7 @@ async fn create_video(
                 &thumbnail_path,
                 &user_id,
                 &video_form.is_private,
+                &video_form.location,
             )
         })
         .await?

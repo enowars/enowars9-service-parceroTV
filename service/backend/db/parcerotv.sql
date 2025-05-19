@@ -13,6 +13,7 @@ CREATE TABLE videos(
     thumbnail_path TEXT NOT NULL,
     UserID INTEGER,
     is_private INTEGER NOT NULL,
+    location TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY (UserID) REFERENCES users(UserID) ON DELETE CASCADE
 );
