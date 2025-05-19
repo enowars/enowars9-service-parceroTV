@@ -7,6 +7,12 @@ pub struct FormInput {
     pub password: String,
 }
 
+#[derive(Deserialize)]
+pub struct CommentForm {
+    pub comment: String,
+    pub video_id: i32,
+}
+
 
 #[derive(Debug, Deserialize)]
 pub struct VideoInfo {
@@ -23,3 +29,5 @@ pub struct VideoForm {
     pub file: TempFile,
     pub thumbnail: TempFile,
 }
+
+

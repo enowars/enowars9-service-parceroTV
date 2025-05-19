@@ -12,6 +12,17 @@
     <source id="video-source" src="" type="video/mp4">
     Your browser does not support the video tag.
   </video>
-
+  <div class="comment-box">
+    <h4>Leave a Comment</h4>
+    <form action="/post_comment" method="post" id="commentForm">
+        <input type="hidden" name="video_id" value="123">
+      <textarea id="commentText" rows="4" placeholder="Write your comment here..." required></textarea>
+      <br>
+      <button type="submit">Post Comment</button>
+    </form>
+  
+    <div id="commentList"></div>
+  </div>
+  
 </body>
 </html>

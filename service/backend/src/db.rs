@@ -103,10 +103,19 @@ pub fn insert_video(conn: Connection, name:&str, description: &str, path: &str, 
     Ok(())
 }
 
-pub fn create_comment(conn:Connection) -> Result<()> {
-   
+pub fn create_comment(conn:Connection, comment: &str, user_id: &i32, videoid: &i32) -> Result<()> {
+   conn.execute(
+    "INSERT INTO comments (comment, userid, videoid) VALUES (?1, ?2, ?3)", 
+    (comment, user_id, videoid))?;
     Ok(())
+}
 
+pub fn is_video_private(conn: &Connection, video_id: &i32) -> Result<bool> {
+    let is_private: i32 = conn.query_row(
+        "SELECT CASE WHEN EXISTS (SELECT videoID FROM videos WHERE videoID = ?1 AND is_private = 1) THEN 1 ELSE 0 END;",
+         params![video_id], |row| row.get(0),)?;
+    
+   Ok(is_private == 1)
 }
 
 
