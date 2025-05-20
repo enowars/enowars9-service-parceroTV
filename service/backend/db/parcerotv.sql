@@ -32,3 +32,8 @@ CREATE VIEW public_videos AS
 SELECT *
 FROM videos
 WHERE is_private = 0;
+
+CREATE VIEW private_videos AS
+SELECT *
+FROM videos
+WHERE is_private = 1;

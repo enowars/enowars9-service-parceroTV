@@ -18,6 +18,7 @@ use backend::save_video;
 use db::create_comment;
 use db::get_all_videos;
 use db::is_video_private;
+use db::select_private_videos_by_userid;
 use db::select_user_id;
 use db::select_user_info;
 use db::select_video_by_path;
@@ -293,11 +294,30 @@ async fn get_videos_by_userid(
     session: Session,
     user_id: web::Path<i32>
 ) -> Result<impl Responder, Error> {
-    println!("/api/fetch_all_videos");
+    println!("get_videos");
     if let Ok(Some(_user_id)) = session.get::<i32>("user_id") {
         let conn = get_db_conn(&pool).await?;
         let user_id = user_id.into_inner();
         let videoss = web::block(move || select_videos_by_userid(conn, user_id))
+            .await?
+            .map_err(error::ErrorInternalServerError)?;
+        Ok(HttpResponse::Ok().json(videoss))
+    } else {
+        Ok(HttpResponse::Unauthorized().body("Please log in"))
+    }
+}
+
+#[get("/get_private_videos/{user_id}")]
+async fn get_private_videos_by_userid(
+    pool: web::Data<Pool>,
+    session: Session,
+    user_id: web::Path<i32>
+) -> Result<impl Responder, Error> {
+    println!("get_private_videos");
+    if let Ok(Some(_user_id)) = session.get::<i32>("user_id") {
+        let conn = get_db_conn(&pool).await?;
+        let user_id = user_id.into_inner();
+        let videoss = web::block(move || select_private_videos_by_userid(conn, user_id))
             .await?
             .map_err(error::ErrorInternalServerError)?;
         Ok(HttpResponse::Ok().json(videoss))
@@ -430,6 +450,7 @@ async fn main() -> std::io::Result<()> {
             .service(get_my_profile)
             .service(update_about)
             .service(get_videos_by_userid)
+            .service(get_private_videos_by_userid)
     })
     .bind(("0.0.0.0", 8000))?
     .run()

@@ -67,6 +67,24 @@ pub fn select_videos_by_userid(conn: Connection, user_id: i32) -> Result<Vec<Vid
     Ok(videos)
 }
 
+pub fn select_private_videos_by_userid(conn: Connection, user_id: i32) -> Result<Vec<VideoInfoPrivate>> {
+    let mut stmt = conn.prepare("SELECT videoid, name, thumbnail_path, location, userId FROM videos WHERE is_private = 1 AND userid = ?1")?;
+
+    let videos = stmt
+        .query_map([user_id], |row| {
+            Ok(VideoInfoPrivate {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                thumbnail_path: row.get(2)?,
+                location: row.get(3)?,
+                userId: row.get(4)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    println!("get_all_videos");
+    Ok(videos)
+}
+
 pub fn select_video_by_path(conn: Connection, path: &str) -> Result<VideoInfo> {
     let mut stmt = conn.prepare("SELECT VideoId, name, description, thumbnail_path, path, is_private, location, userID FROM videos WHERE path = (?1) ORDER BY videoID LIMIT 1")?;
     let video: VideoInfo = stmt.query_row(
@@ -182,6 +200,15 @@ pub struct VideoInfo{
     pub thumbnail_path: String,
     pub path: String,
     pub is_private: i32,
+    pub location: String,
+    pub userId: i32,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct VideoInfoPrivate {
+    pub id: i32,
+    pub name: String,
+    pub thumbnail_path: String,
     pub location: String,
     pub userId: i32,
 }
