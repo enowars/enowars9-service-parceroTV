@@ -104,6 +104,33 @@ pub fn select_video_by_path(conn: Connection, path: &str) -> Result<VideoInfo> {
     Ok(video)
 }
 
+pub fn select_comments_by_video_id(conn: Connection, video_id: &i32) -> Result<Vec<CommentWithUserInfo>> {
+    let mut stmt = conn.prepare("SELECT 
+    comments.CommentsID,
+    comments.comment,
+    comments.UserID,
+    users.name AS username,
+    comments.created_at
+FROM comments
+JOIN users ON comments.UserID = users.UserID
+WHERE comments.VideoID = ?1
+ORDER BY comments.created_at DESC;")?;
+
+    let comments = stmt
+        .query_map([video_id], |row| {
+            Ok(CommentWithUserInfo {
+                comment_id: row.get(0)?,
+                comment: row.get(1)?,
+                user_id: row.get(2)?,
+                username: row.get(3)?,
+                created_at: row.get(4)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    println!("get_all_videos");
+    Ok(comments)
+}
+
 pub fn user_has_permission(conn: &Connection, user_id: &i32, path: &str) -> Result<bool> {
     let result: Result<i32> = conn.query_row(
         "SELECT userID FROM videos WHERE userID = ?1 AND path = ?2;",
@@ -218,4 +245,14 @@ pub struct UserInfo{
     pub id: i32,
     pub name: String,
     pub about: Option<String>,
+}
+
+
+#[derive(Debug, serde::Serialize)]
+pub struct CommentWithUserInfo{
+    comment_id: i32,
+    comment: String,
+    user_id: i32,
+    username: String,
+    created_at: String,
 }

@@ -1,8 +1,8 @@
 document.addEventListener("DOMContentLoaded", function () {
     const params = new URLSearchParams(window.location.search);
     const filename = params.get("file");
-    const video_id = params.get("id")
-
+    const video_id = params.get("id");
+    console.log("hi");
     async function getVideoInfo(path) {
         try {
             const res = await fetch("/get_video_info/" + path);
@@ -34,6 +34,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     }
 
+    getComments(video_id);
     getVideoInfo(filename);
     if (video_id) {
         document.getElementById("videoID").setAttribute('value', video_id);
@@ -46,4 +47,47 @@ document.addEventListener("DOMContentLoaded", function () {
     } else {
         document.body.innerHTML += "<p>No video specified.</p>";
     }
+    console.log("test");
+    async function getComments(video_id) {
+        console.log("sad");
+        try {
+            const res = await fetch("/get_comments/" + video_id);
+            const comments = await res.json();
+
+
+            const container = document.getElementById("commentList");
+            for (const comment of comments) {
+                const commentDiv = document.createElement("div");
+                commentDiv.className = "comment";
+
+                const userLink = document.createElement("a");
+                userLink.href = `/app/users?id=${comment.user_id}`;
+                userLink.textContent = comment.username;
+                userLink.className = "comment-user";
+
+
+                const timestamp = document.createElement("span");
+                timestamp.textContent = ` • ${comment.created_at}`;
+                timestamp.className = "comment-time";
+
+
+                const header = document.createElement("div");
+                header.className = "comment-header";
+                header.appendChild(userLink);
+                header.appendChild(timestamp);
+
+                const body = document.createElement("p");
+                body.textContent = comment.comment;
+                body.className = "comment-body";
+
+                commentDiv.appendChild(header);
+                commentDiv.appendChild(body);
+                container.appendChild(commentDiv);
+            }
+        }
+        catch (e) {
+            console.log("error fetching comments" + e);
+        }
+    }
+    
 });

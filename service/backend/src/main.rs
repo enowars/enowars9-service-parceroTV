@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use actix_files::Files;
 use actix_files::NamedFile;
 use actix_multipart::form::MultipartForm;
+use actix_web::http::header;
 use actix_web::HttpRequest;
 use actix_web::error::ErrorInternalServerError;
 use actix_web::{
@@ -18,6 +19,7 @@ use backend::save_video;
 use db::create_comment;
 use db::get_all_videos;
 use db::is_video_private;
+use db::select_comments_by_video_id;
 use db::select_private_videos_by_userid;
 use db::select_user_id;
 use db::select_user_info;
@@ -244,7 +246,9 @@ async fn post_comment(
     pool: web::Data<Pool>,
     session: Session,
     form: web::Form<CommentForm>,
+    req: HttpRequest,
 ) -> Result<impl Responder, Error> {
+    println!("post_comment");
     if let Ok(Some(user_id)) = session.get::<i32>("user_id") {
         let conn = get_db_conn(&pool).await?;
         let comment_form = form.into_inner();
@@ -263,7 +267,16 @@ async fn post_comment(
         })
         .await?
         .map_err(error::ErrorInternalServerError);
-        Ok(HttpResponse::Ok().finish())
+        
+        let referer = req
+        .headers()
+        .get(header::REFERER)
+        .and_then(|h| h.to_str().ok())
+        .unwrap_or("/");
+
+    Ok(HttpResponse::SeeOther()
+        .append_header((header::LOCATION, referer))
+        .finish())
     } else {
         Ok(HttpResponse::Unauthorized().body("Please log in"))
     }
@@ -321,6 +334,25 @@ async fn get_private_videos_by_userid(
             .await?
             .map_err(error::ErrorInternalServerError)?;
         Ok(HttpResponse::Ok().json(videoss))
+    } else {
+        Ok(HttpResponse::Unauthorized().body("Please log in"))
+    }
+}
+
+#[get("/get_comments/{video_id}")]
+async fn get_comments(
+    pool: web::Data<Pool>,
+    session: Session,
+    video_id: web::Path<i32>
+) -> Result<impl Responder, Error> {
+    println!("get_comments");
+    if let Ok(Some(_user_id)) = session.get::<i32>("user_id") {
+        let conn = get_db_conn(&pool).await?;
+        let video_id = video_id.into_inner();
+        let comments = web::block(move || select_comments_by_video_id(conn, &video_id))
+            .await?
+            .map_err(error::ErrorInternalServerError)?;
+        Ok(HttpResponse::Ok().json(comments))
     } else {
         Ok(HttpResponse::Unauthorized().body("Please log in"))
     }
@@ -451,6 +483,8 @@ async fn main() -> std::io::Result<()> {
             .service(update_about)
             .service(get_videos_by_userid)
             .service(get_private_videos_by_userid)
+            .service(post_comment)
+            .service(get_comments)
     })
     .bind(("0.0.0.0", 8000))?
     .run()
