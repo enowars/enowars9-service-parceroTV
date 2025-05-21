@@ -3,7 +3,9 @@ import asyncio
 import random
 import string
 import faker
+import os
 from httpx import AsyncClient
+from names import adjectives, content_types, cities, countrys
 
 
 from typing import Optional
@@ -66,8 +68,79 @@ async def login(client: AsyncClient, username:str, password: str):
         logger.error(f"Failed Login of user {username} should be Unauthozired {status_code}")
         raise MumbleException(f"Failed Login of user {username} should be Unauthozired {status_code}")
 
+def generate_title() -> str:
+    adj = random.choice(adjectives)
+    content = random.choice(content_types)
+    number = random.randint(1, 10000)
+    return f"{adj}-{content}-{number}"
 
+def generate_location() -> str:
+    country = random.choice(countrys)
+    city = random.choice(cities)
+    return f"{country}, {city}"
 
+def get_random_video_path(path="videos") -> str:
+    video_extensions = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".flv"}
+    with os.scandir(path) as entries:
+        videos = [entry.name for entry in entries
+                  if entry.is_file() and os.path.splitext(entry.name)[1].lower() in video_extensions]
+    if not videos:
+        raise FileNotFoundError("No video files found in the directory.")
+    return os.path.join(path, random.choice(videos))
+    
+def get_random_thumbnail_path(path="thumbnails") -> str:
+    """Returns the full path to a random PNG thumbnail from the specified directory."""
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Directory '{path}' does not exist.")
+    
+    thumbnails = [
+        f for f in os.listdir(path)
+        if os.path.isfile(os.path.join(path, f)) and f.lower().endswith(".png")
+    ]
+
+    if not thumbnails:
+        raise FileNotFoundError("No PNG thumbnails found in the directory.")
+
+    return os.path.join(path, random.choice(thumbnails))
+    
+
+def create_video_with_metadata(creator, location, title):
+    """change metadata of video so it can be exploited later with ffmpeg"""
+    logger.info(f"Changing the metadata of the Video {title} with location {location} from creator {creator}")
+    video_path = get_random_video_path()
+    ffmpeg.input(video_path).output(
+    'metadata_video.mp4',
+    **{
+        'metadata:title': title,
+        'metadata:creator': creator,
+        'metadata:location': location
+    }
+).overwrite_output().run()
+  
+    
+
+async def upload_private_video(client: AsyncClient, description, location, title)-> str:
+   """Upload a private video, description is the flag store"""
+   logger.info(f"uploading a private video")
+   
+   multiform_data = {
+        "name": (None,title),
+        "description": (None,description),
+        "location": (None,location),
+        "thumbnail": ("thumbnail", open(get_random_thumbnail_path(),"rb"), "image/png"),
+        "file": ("video", "metadata_video.mp4", "video/mp4"),
+        "is_private": (None,1)
+    }
+   response = await client.post("create_video", files=multiform_data)
+   status_code = response.status_code
+   
+   if status_code in [303]:
+       logger.info(f"Video was succesfully uploaded")
+       redirect_url = response.headers.get("Location")
+       logger.info(f"Redirected to: {redirect_url}")
+       return redirect_url 
+   else:
+       raise MumbleException(f"failed to upload video {title}, with location: {location}")
 
 """
 CHECKER FUNCTIONS
@@ -80,7 +153,6 @@ async def putflag_note(
     client: AsyncClient,
     logger: LoggerAdapter,    
 ) -> None:
-    # First we need to register a user. So let's create some random strings. (Your real checker should use some funny usernames or so)
     username: str = "".join(
         random.choices(string.ascii_uppercase + string.digits, k=12)
     )
@@ -88,69 +160,41 @@ async def putflag_note(
         random.choices(string.ascii_uppercase + string.digits, k=12)
     )
 
-    # Log a message before any critical action that could raise an error.
     logger.debug(f"Connecting to service")
     # Register a new user
     await client.signup(username, password)
-
     # Login
-    await client.login_user(username, password)
+    await client.login(username, password)
     
-    # Finally, we can post our note!
-    logger.debug(f"Sending command to set the flag")
-    conn.writer.write(f"set {task.flag}\n".encode())
-    await conn.writer.drain()
-    await conn.reader.readuntil(b"Note saved! ID is ")
-
-    try:
-        # Try to retrieve the resulting noteId. Using rstrip() is hacky, you should probably want to use regular expressions or something more robust.
-        noteId = (await conn.reader.readuntil(b"!\n>")).rstrip(b"!\n>").decode()
-    except Exception as ex:
-        logger.debug(f"Failed to retrieve note: {ex}")
-        raise MumbleException("Could not retrieve NoteId")
-
-    assert_equals(len(noteId) > 0, True, message="Empty noteId received")
-
-    logger.debug(f"Got noteId {noteId}")
-
-    # Exit!
-    logger.debug(f"Sending exit command")
-    conn.writer.write(f"exit\n".encode())
-    await conn.writer.drain()
+    #Create Data for video
+    title = generate_title()
+    location = generate_location()
+    description: str  = "".join(random.choices(string.ascii_uppercase + string.digits, k=12))
+    logger.debug(f"Creating video with right metadata for exploit")
+    create_video_with_metadata(creator=username, location=location, title=title)
+    logger.debug(f"Saving flag")
+    url = await upload_private_video(client, description, location, title)
     
-    # Save the generated values for the associated getflag() call.
-    await db.set("userdata", (username, password, noteId))
+
+    #save flag and userdata
+    await db.set("userdata", (username, password, url, description))
 
     return username
 
 @checker.getflag(0)
 async def getflag_note(
-    task: GetflagCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, conn: Connection
+    task: GetflagCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, client: AsyncClient
 ) -> None:
     try:
-        username, password, noteId = await db.get("userdata")
+        username, password, url, description = await db.get("userdata")
     except KeyError:
         raise MumbleException("Missing database entry from putflag")
 
-    logger.debug(f"Connecting to the service")
-    await conn.reader.readuntil(b">")
+    await login(client, username, password)
 
-    # Let's login to the service
-    await conn.login_user(username, password)
-
-    # Let´s obtain our note.
-    logger.debug(f"Sending command to retrieve note: {noteId}")
-    conn.writer.write(f"get {noteId}\n".encode())
-    await conn.writer.drain()
-    note = await conn.reader.readuntil(b">")
-    assert_in(
-        task.flag.encode(), note, "Resulting flag was found to be incorrect"
-    )
-
-    # Exit!
-    logger.debug(f"Sending exit command")
-    conn.writer.write(f"exit\n".encode())
-    await conn.writer.drain()
+    response = await client.get(url)
+    logger.debug(response.text)
+    assert_in(task.flag, response.text, "Flag missing")
         
 
 @checker.putnoise(0)
