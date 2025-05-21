@@ -3,6 +3,7 @@ import asyncio
 import random
 import string
 import faker
+from httpx import AsyncClient
 
 
 from typing import Optional
@@ -40,34 +41,32 @@ app = lambda: checker.app
 Utility functions
 """
 
-class Connection:
-    def __init__(self, socket: AsyncSocket, logger: LoggerAdapter):
-        self.reader, self.writer = socket[0], socket[1]
-        self.logger = logger
+async def signup(client: AsyncClient, username: str, password:str):
+    logger.info(f"Starting signup process for user: {user_name}")
+    signup_data = {"username": username,
+                   "password": password}
+    response = await client.post("/newuser", data=signup_data)
+    status_code = response.status_code
+    logger.info(f"Received status code {status_code} for signup process")
+    if status_code in [200]:
+        logger.info(f"user:{username} successfully registered")
+    else:
+        logger.error(f"Failed to sign up user, status_code: {status_code}")
+        raise MumbleException(f"Failed to sign up user, status_code: {status_code}")
 
-    async def register_user(self, username: str, password: str):
-        self.logger.debug(
-            f"Sending command to register user: {username} with password: {password}"
-        )
-        self.writer.write(f"reg {username} {password}\n".encode())
-        await self.writer.drain()
-        data = await self.reader.readuntil(b">")
-        if not b"User successfully registered" in data:
-            raise MumbleException("Failed to register user")
-
-    async def login_user(self, username: str, password: str):
-        self.logger.debug(f"Sending command to login.")
-        self.writer.write(f"log {username} {password}\n".encode())
-        await self.writer.drain()
-
-        data = await self.reader.readuntil(b">")
-        if not b"Successfully logged in!" in data:
-            raise MumbleException("Failed to log in!")
+async def login(client: AsyncClient, username:str, password: str):
+    logger.info(f"Starting login process for user: {username}")
+    login_data = {"username": username,
+                   "password": password}
+    response = await client.post("/checkcredentials", login_data)
+    status_code = response.status_code
+    if status_code in [303]:
+        logger.info(f"Successfull login of user {username} with redirection {status_code}")
+    else:
+        logger.error(f"Failed Login of user {username} should be Unauthozired {status_code}")
+        raise MumbleException(f"Failed Login of user {username} should be Unauthozired {status_code}")
 
 
-@checker.register_dependency
-def _get_connection(socket: AsyncSocket, logger: LoggerAdapter) -> Connection:
-    return Connection(socket, logger)
 
 
 """
@@ -78,7 +77,7 @@ CHECKER FUNCTIONS
 async def putflag_note(
     task: PutflagCheckerTaskMessage,
     db: ChainDB,
-    conn: Connection,
+    client: AsyncClient,
     logger: LoggerAdapter,    
 ) -> None:
     # First we need to register a user. So let's create some random strings. (Your real checker should use some funny usernames or so)
@@ -91,14 +90,12 @@ async def putflag_note(
 
     # Log a message before any critical action that could raise an error.
     logger.debug(f"Connecting to service")
-    welcome = await conn.reader.readuntil(b">")
-
     # Register a new user
-    await conn.register_user(username, password)
+    await client.signup(username, password)
 
-    # Now we need to login
-    await conn.login_user(username, password)
-
+    # Login
+    await client.login_user(username, password)
+    
     # Finally, we can post our note!
     logger.debug(f"Sending command to set the flag")
     conn.writer.write(f"set {task.flag}\n".encode())

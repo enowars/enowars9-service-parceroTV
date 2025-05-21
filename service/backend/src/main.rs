@@ -83,7 +83,7 @@ async fn check_credentials(
 
     let password = match maybe_password {
         Some(password) => password,
-        None => return Ok(HttpResponse::Ok().body("User not auth!")),
+        None => return Ok(HttpResponse::Unauthorized().body("User not auth!")),
     };
 
     if (password == typed_password) {
@@ -94,7 +94,7 @@ async fn check_credentials(
         session.insert("user_id", user_id).unwrap();
         return Ok(redirect!("/app/home"));
     } else {
-        return Ok(HttpResponse::Ok().body("User not auth!"));
+        return Ok(HttpResponse::Unauthorized().body("User not auth!"));
     }
 }
 
