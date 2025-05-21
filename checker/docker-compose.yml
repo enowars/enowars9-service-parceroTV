@@ -1,0 +1,17 @@
+version: '2.1'
+
+services:
+  parcerotv-checker:
+    build: .
+    # The checker runs a HTTP interfaces, so we need to map port 3031 to the outside (port 8000).
+    ports:
+      - 17777:8000
+    mem_limit: 1G
+    memswap_limit: 2G
+    ulimits:
+      core:
+        soft: 0
+        hard: 0
+      nproc:
+        soft: 4000
+        hard: 4000
