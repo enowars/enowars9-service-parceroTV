@@ -6,6 +6,31 @@ services:
     # The checker runs a HTTP interfaces, so we need to map port 3031 to the outside (port 8000).
     ports:
       - 17777:8000
+    environment:
+      - MONGO_ENABLED=1
+      - MONGO_HOST=parcerotv-mongo
+      - MONGO_PORT=27017
+      - MONGO_USER=parcerotv
+      - MONGO_PASSWORD=parcerotv
+    mem_limit: 1G
+    memswap_limit: 2G
+    ulimits:
+      core:
+        soft: 0
+        hard: 0
+      nproc:
+        soft: 4000
+        hard: 4000
+
+  parcerotv-mongo:
+    image: mongo
+    #ports:
+    #  - 27017:27017
+    volumes:
+      - ./data:/data/db
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=parcerotv
+      - MONGO_INITDB_ROOT_PASSWORD=parcerotv
     mem_limit: 1G
     memswap_limit: 2G
     ulimits:
