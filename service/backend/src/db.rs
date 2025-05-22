@@ -46,6 +46,27 @@ pub fn get_all_videos(conn: Connection) -> Result<Vec<VideoInfo>> {
     Ok(videos)
 }
 
+pub fn select_my_videos(conn: Connection, user_id: &i32) -> Result<Vec<VideoInfo>> {
+    let mut stmt = conn.prepare("SELECT videoid, name, description, thumbnail_path, path, is_private, location, userId FROM videos WHERE userid = ?1 ORDER BY created_at DESC")?;
+
+    let videos = stmt
+        .query_map([user_id], |row| {
+            Ok(VideoInfo {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                description: row.get(2)?,
+                thumbnail_path: row.get(3)?,
+                path: row.get(4)?,
+                is_private: row.get(5)?,
+                location: row.get(6)?,
+                userId: row.get(7)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    println!("select_my_videos");
+    Ok(videos)
+}
+
 pub fn select_videos_by_userid(conn: Connection, user_id: i32) -> Result<Vec<VideoInfo>> {
     let mut stmt = conn.prepare("SELECT videoid, name, description, thumbnail_path, path, is_private, location, userId FROM videos WHERE is_private = 0 AND userid = ?1")?;
 

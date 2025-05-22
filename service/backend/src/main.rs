@@ -20,6 +20,7 @@ use db::create_comment;
 use db::get_all_videos;
 use db::is_video_private;
 use db::select_comments_by_video_id;
+use db::select_my_videos;
 use db::select_private_videos_by_userid;
 use db::select_user_id;
 use db::select_user_info;
@@ -302,6 +303,24 @@ async fn fetch_all_videos(
     }
 }
 
+#[get("/get_my_videos")]
+async fn get_my_videos(
+    pool: web::Data<Pool>,
+    session: Session,
+) -> Result<impl Responder, Error> {
+    println!("/api/fetch_all_videos");
+    if let Ok(Some(user_id)) = session.get::<i32>("user_id") {
+        let conn = get_db_conn(&pool).await?;
+
+        let videoss = web::block(move || select_my_videos(conn, &user_id))
+            .await?
+            .map_err(error::ErrorInternalServerError)?;
+        Ok(HttpResponse::Ok().json(videoss))
+    } else {
+        Ok(HttpResponse::Unauthorized().body("Please log in"))
+    }
+}
+
 #[get("/get_videos/{user_id}")]
 async fn get_videos_by_userid(
     pool: web::Data<Pool>,
@@ -506,6 +525,7 @@ async fn main() -> std::io::Result<()> {
             .service(get_private_videos_by_userid)
             .service(post_comment)
             .service(get_comments)
+            .service(get_my_videos)
     })
     .bind(("0.0.0.0", 8000))?
     .run()
