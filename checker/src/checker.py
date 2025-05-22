@@ -44,8 +44,8 @@ app = lambda: checker.app
 Utility functions
 """
 
-async def signup(client: AsyncClient, username: str, password:str):
-    logger.info(f"Starting signup process for user: {user_name}")
+async def signup(client: AsyncClient, username: str, password:str, logger):
+    logger.info(f"Starting signup process for user: {username}")
     signup_data = {"username": username,
                    "password": password}
     response = await client.post("/newuser", data=signup_data)
@@ -57,7 +57,7 @@ async def signup(client: AsyncClient, username: str, password:str):
         logger.error(f"Failed to sign up user, status_code: {status_code}")
         raise MumbleException(f"Failed to sign up user, status_code: {status_code}")
 
-async def login(client: AsyncClient, username:str, password: str):
+async def login(client: AsyncClient, username:str, password: str, logger):
     logger.info(f"Starting login process for user: {username}")
     login_data = {"username": username,
                    "password": password}
@@ -105,7 +105,7 @@ def get_random_thumbnail_path(path="thumbnails") -> str:
     return os.path.join(path, random.choice(thumbnails))
     
 
-def create_video_with_metadata(creator, location, title, is_exploit=False):
+def create_video_with_metadata(creator, location, title,logger, is_exploit=False):
     """change metadata of video so it can be exploited later with ffmpeg"""
     if is_exploit:
         path = 'exploit.mp4'
@@ -124,7 +124,7 @@ def create_video_with_metadata(creator, location, title, is_exploit=False):
   
     
 
-async def upload_private_video(client: AsyncClient, description, location, title, is_exploit=False)-> str:
+async def upload_private_video(client: AsyncClient, description, location, title, logger, is_exploit=False)-> str:
    """Upload a private video, description is the flag store"""
    logger.info(f"uploading a private video")
    if is_exploit:
@@ -180,9 +180,9 @@ async def putflag_note(
     location = generate_location()
     description: str  = "".join(random.choices(string.ascii_uppercase + string.digits, k=12))
     logger.debug(f"Creating video with right metadata for exploit")
-    create_video_with_metadata(creator=username, location=location, title=title)
+    create_video_with_metadata(creator=username, location=location, title=title,logger=logger)
     logger.debug(f"Saving flag")
-    url = await upload_private_video(client, description, location, title)
+    url = await upload_private_video(client, description, location, title, logger)
     
 
     #save flag and userdata
@@ -217,8 +217,8 @@ async def exploit0(task: ExploitCheckerTaskMessage, searcher: FlagSearcher, clie
         random.choices(string.ascii_uppercase + string.digits, k=12)
     )
     
-    await signup(client, username_attacker, password_attacker)
-    await login(client, username_attacker, password_attacker)
+    await signup(client, username_attacker, password_attacker, logger)
+    await login(client, username_attacker, password_attacker, logger)
     
     
     logger.info(f"Exploiting {task.attack_info} ")
@@ -235,8 +235,8 @@ async def exploit0(task: ExploitCheckerTaskMessage, searcher: FlagSearcher, clie
     title = video.get("name")
     location = video.get("location")
     
-    create_video_with_metadata(username, location, title, is_exploit=True)
-    upload_private_video(client, "ist egal", "Berlin", title,True)
+    create_video_with_metadata(username, location, title,logger, is_exploit=True)
+    upload_private_video(client, "ist egal", "Berlin", title,logger, True)
     
     my_vid_response = await client.get("/get_my_videos")
     if my_vid_response.status_code != 200:
