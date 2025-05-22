@@ -105,6 +105,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 img.style.width = "200px";
 
                 const h3 = document.createElement("h3");
+                h3.className = "video-name";
                 h3.textContent = video.name;
 
                 const creator_link = document.createElement("a");
@@ -117,6 +118,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 creator_link.appendChild(creator);
 
                 const p = document.createElement("p");
+                p.className = "video-location"
                 p.textContent = video.location;
 
                 const hr = document.createElement("hr");
