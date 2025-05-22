@@ -4,3 +4,4 @@ gunicorn
 faker
 httpx
 ffmpeg-python
+bs4
