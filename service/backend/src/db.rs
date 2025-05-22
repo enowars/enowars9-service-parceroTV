@@ -171,6 +171,21 @@ pub fn select_user_info(conn: Connection, id: &i32) -> Result<UserInfo> {
     Ok(user_info)
 }
 
+pub fn select_user_info_with_name(conn: Connection, id: &String) -> Result<UserInfo> {
+    let user_info = conn.query_row(
+        "SELECT UserID, name, about FROM users WHERE name = (?1)",
+        params![id],
+        |row| {
+            Ok(UserInfo {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                about: row.get(2)?,
+            })},
+    )?;
+    
+    Ok(user_info)
+}
+
 pub fn select_password(conn:Connection, name: &str) -> Result<Option<String>> {
     let password = conn.query_row(
         "SELECT password FROM users WHERE name = (?1)",

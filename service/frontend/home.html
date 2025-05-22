@@ -53,9 +53,10 @@
 
                     const creator_link = document.createElement("a");
 
-                    creator_link.setAttribute("href", "app/users?id=" + video.userId);
+                    
                     const creator = document.createElement("h4");
                     const creatorName = await fetchUserName(video.userId); 
+                    creator_link.setAttribute("href", "app/users?name=" + creatorName);
                     creator.textContent = "By " + creatorName;
 
                     creator_link.appendChild(creator);

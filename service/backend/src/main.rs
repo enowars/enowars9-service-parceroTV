@@ -23,6 +23,7 @@ use db::select_comments_by_video_id;
 use db::select_private_videos_by_userid;
 use db::select_user_id;
 use db::select_user_info;
+use db::select_user_info_with_name;
 use db::select_video_by_path;
 use db::select_videos_by_userid;
 use db::update_about_user;
@@ -377,6 +378,25 @@ async fn get_user_info(
     }
 }
 
+#[get("/get_user_info_with_name/{name}")]
+async fn get_user_info_with_name(
+    pool: web::Data<Pool>,
+    session: Session,
+    name: web::Path<String>,
+) -> Result<impl Responder, Error> {
+    println!("User info called");
+    if let Ok(Some(_user_id)) = session.get::<i32>("user_id") {
+        let conn = get_db_conn(&pool).await?;
+        let name = name.into_inner();
+        let user_info = web::block(move || select_user_info_with_name(conn, &name))
+            .await?
+            .map_err(error::ErrorInternalServerError)?;
+        Ok(HttpResponse::Ok().json(user_info))
+    } else {
+        Ok(HttpResponse::Unauthorized().body("Please log in"))
+    }
+}
+
 #[get("/get_video_info/{path:.*}")]
 async fn get_video_info(
     pool: web::Data<Pool>,
@@ -479,6 +499,7 @@ async fn main() -> std::io::Result<()> {
             .service(get_video_info)
             .service(logout)
             .service(get_user_info)
+            .service(get_user_info_with_name)
             .service(get_my_profile)
             .service(update_about)
             .service(get_videos_by_userid)

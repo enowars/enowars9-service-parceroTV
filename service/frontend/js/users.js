@@ -1,19 +1,23 @@
 document.addEventListener("DOMContentLoaded", function () {
     const params = new URLSearchParams(window.location.search);
-    const id = params.get("id");
+    let id;
+    const name = params.get("name");
 
-    async function fetchUser(id) {
+    async function fetchUser(name) {
         try {
-            const res = await fetch("/get_user_info/" + id);
+            const res = await fetch("/get_user_info_with_name/" + name);
             const user = await res.json();
 
             document.getElementById("name").innerText = user.name;
             document.getElementById("about").innerText = user.about;
+            id = user.id;
+            console.log(user.id)
         }
         catch {
             console.log("Fetching User Data not possible")
         }
     }
+
     async function fetchUserName(id) {
         try {
             const res = await fetch("/get_user_info/" + id);
@@ -25,13 +29,19 @@ document.addEventListener("DOMContentLoaded", function () {
             console.log("Fetching User Data not possible")
         }
     }
-
-
-    fetchUser(id);
+    async function init() {
+        await fetchUser(name);
+        if (!id) {
+            console.error("User ID is missing. Aborting.");
+            return;
+        }
+        await loadPublicVideos();
+        await loadPrivateVideoInfo(id);
+    }
 
     async function loadPublicVideos() {
         try {
-            const res = await fetch("/get_videos/"+id);
+            const res = await fetch("/get_videos/" + id);
             const videos = await res.json();
 
             const container = document.getElementById("public_video_list");
@@ -55,7 +65,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
                 creator_link.setAttribute("href", "app/users?id=" + video.userId);
                 const creator = document.createElement("h4");
-                const creatorName = await fetchUserName(video.userId); 
+                const creatorName = await fetchUserName(video.userId);
                 creator.textContent = "By " + creatorName;
 
                 creator_link.appendChild(creator);
@@ -78,12 +88,9 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
-    loadPublicVideos();
-    loadPrivateVideoInfo(id);
-
     async function loadPrivateVideoInfo(id) {
         try {
-            const res = await fetch("/get_private_videos/"+id);
+            const res = await fetch("/get_private_videos/" + id);
             const videos = await res.json();
 
             const container = document.getElementById("private_video_list");
@@ -104,7 +111,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
                 creator_link.setAttribute("href", "app/users?id=" + video.userId);
                 const creator = document.createElement("h4");
-                const creatorName = await fetchUserName(video.userId); 
+                const creatorName = await fetchUserName(video.userId);
                 creator.textContent = "By " + creatorName;
 
                 creator_link.appendChild(creator);
@@ -126,7 +133,7 @@ document.addEventListener("DOMContentLoaded", function () {
             console.log("Error Fetching Videos" + e);
         }
     }
+    init();
 
 
-    
 });
