@@ -6,10 +6,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Profile</title>
     <script src="/js/profile.js"></script>
+    <link rel="stylesheet" href="/css/navigation.css" />
+    <link rel="stylesheet" href="/css/videos.css" />
     <base href="/">
 </head>
 
 <body>
+    <div id="body">
+        <div id="header"></div>
     <h1>Profile of <span id="name"></span></h1>
     <form action="/update_about" method="post">
         <label for="about">Update your About section:</label><br><br>
@@ -19,10 +23,11 @@
 
         <button type="submit">Save Changes</button>
     </form>
-    <h2>Public Videos</h2>
-    <div id="public_video_list"></div>
-    <h2>Private Videos</h2>
-    <div id="private_video_list"></div>
+    
+    <div id="public_video_list" class="video-list"><header class="video-list-header">Public Videos</header></div>
+    <div id="private_video_list" class="video-list"><header class="video-list-header">Private Videos</header></div>
+    <div id="footer"></div>
+</div>
 </body>
 
 </html>

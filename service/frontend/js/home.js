@@ -35,9 +35,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
                 const creator_link = document.createElement("a");
 
-                
+
                 const creator = document.createElement("h4");
-                const creatorName = await fetchUserName(video.userId); 
+                const creatorName = await fetchUserName(video.userId);
                 creator_link.setAttribute("href", "app/users?name=" + creatorName);
                 creator.textContent = "By " + creatorName;
 
@@ -47,13 +47,12 @@ document.addEventListener("DOMContentLoaded", function () {
                 p.textContent = video.description;
 
                 const hr = document.createElement("hr");
-
+                const div_info = document.createElement("div");
                 div.appendChild(img);
-                div.appendChild(link);
-                div.appendChild(creator_link);
-                div.appendChild(p);
-                div.appendChild(hr);
-
+                div_info.appendChild(link);
+                div_info.appendChild(p);
+                div_info.appendChild(creator_link);
+                div.appendChild(div_info)
                 container.appendChild(div);
             }
         }
@@ -63,12 +62,24 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     fetch("/header")
-    .then(res => res.text())
-    .then(html => document.getElementById("header").innerHTML = html);
+        .then(res => res.text())
+        .then(html => document.getElementById("header").innerHTML = html);
 
     fetch("/footer")
-    .then(res => res.text())
-    .then(html => document.getElementById("footer").innerHTML = html)
+        .then(res => res.text())
+        .then(html => document.getElementById("footer").innerHTML = html)
 
-    loadVideos();
+    async function init() {
+        await loadVideos();
+        const links = document.querySelectorAll("header > nav > a");
+        const currentPath = window.location.pathname;
+        console.log(links);
+        links.forEach(link => {
+            if (link.getAttribute('href') === currentPath) {
+                link.classList.add('active');
+            }
+        });
+    }
+    init();
+
 });

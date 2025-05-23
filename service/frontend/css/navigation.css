@@ -1,0 +1,48 @@
+footer {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    margin-top: 10px;
+}
+
+#links-footer > a {
+    margin-left: 2.5px;
+    margin-right: 2.5px;
+}
+
+#body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100vh;
+}
+
+a:visited {
+    color: blue;
+}
+
+header>nav>a {
+    padding: 20px;
+    padding-right: 20px;
+    margin: 7px;
+    background-color: #bbccee;
+    border: 1px solid #dededd;
+    border-radius: 4%;
+    width: 100px;
+    height: 20px;
+    text-align: center;
+    font-weight: 600;
+}
+
+header > nav > a.active {
+    background-color: #dededd;
+  }
+
+header>nav {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+}
+
+

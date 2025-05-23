@@ -54,5 +54,23 @@ document.addEventListener("DOMContentLoaded", function () {
             console.error("Error fetching videos "+ e);
         }
     }
-    get_my_videos()
+    fetch("/header")
+        .then(res => res.text())
+        .then(html => document.getElementById("header").innerHTML = html);
+
+    fetch("/footer")
+        .then(res => res.text())
+        .then(html => document.getElementById("footer").innerHTML = html)
+    async function init() {
+        await get_my_videos();
+        const links = document.querySelectorAll("header > nav > a");
+        const currentPath = window.location.pathname;
+        console.log(links);
+        links.forEach(link => {
+            if (link.getAttribute('href') === currentPath) {
+                link.classList.add('active');
+            }
+        });
+    }
+    init();
 });
