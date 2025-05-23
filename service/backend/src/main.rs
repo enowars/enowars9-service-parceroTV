@@ -499,9 +499,12 @@ async fn main() -> std::io::Result<()> {
             .service(check_credentials)
             .service(private_videos)
             .service(Files::new("/login", "../frontend").index_file("login.html"))
+            .service(Files::new("/header", "../frontend").index_file("header.html"))
+            .service(Files::new("/footer", "../frontend").index_file("footer.html"))
             .service(Files::new("/register", "../frontend").index_file("register.html"))
             .service(Files::new("/js", "../frontend/js/").show_files_listing())
-            .service(Files::new("/css", "../frontend/css/"))
+            .service(Files::new("/css", "../frontend/css/").show_files_listing())
+            .service(Files::new("/assets", "../frontend/assets/").show_files_listing())
             .service(Files::new("/videos", "../data/videos/").show_files_listing())
             .service(Files::new("/thumbnails", "../data/thumbnails/").show_files_listing())
             .service(
