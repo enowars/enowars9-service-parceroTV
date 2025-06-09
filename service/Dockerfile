@@ -16,12 +16,15 @@ RUN apt-get update && apt-get install -y \
     libavfilter-dev \         
     libavdevice-dev \
     libswscale-dev \
-    libavresample-dev
+    libavresample-dev \
+    sqlite3 
 
 
 # Copy our entrypoint.sh and make it executable
 COPY entrypoint.sh /
 RUN chmod +x /entrypoint.sh
+COPY /backend/db/ /service/backend/db
+RUN sh /service/backend/db/start_db.sh
 
 # Copy our service
 COPY /backend/src/ /service/backend/src
