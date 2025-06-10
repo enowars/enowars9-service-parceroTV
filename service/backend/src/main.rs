@@ -507,6 +507,7 @@ async fn main() -> std::io::Result<()> {
             .service(Files::new("/assets", "../frontend/assets/").show_files_listing())
             .service(Files::new("/videos", "../data/videos/").show_files_listing())
             .service(Files::new("/thumbnails", "../data/thumbnails/").show_files_listing())
+            .service(Files::new("/private", "../data/private/").show_files_listing())
             .service(
                 web::scope("/app")
                     .service(profile)

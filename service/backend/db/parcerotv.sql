@@ -7,8 +7,8 @@ CREATE TABLE users (
 
 CREATE TABLE videos(
     VideoID INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL CHECK(length(name) <= 20),
-    description TEXT NOT NULL CHECK(length(description) <= 1000),
+    name TEXT NOT NULL CHECK(length(name) <= 200),
+    description TEXT NOT NULL CHECK(length(description) <= 2000),
     path TEXT NOT NULL,
     thumbnail_path TEXT NOT NULL,
     UserID INTEGER,

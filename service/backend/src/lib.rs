@@ -92,24 +92,25 @@ fn calculate_hash<T: Hash>(t: &T) -> u64 {
 pub struct VideoMetadata {
     pub title: String,
     pub creator: String,
-    pub location: String,
+    pub genre: String,
 }
 
 pub fn read_metadata(title: &str, file: &NamedTempFile) -> VideoMetadata {
     ffmpeg::init().unwrap();
 
-    let path = file.path().to_str().unwrap();
-    let mut location = String::from("unknown");
+    let path = file.path();
+    let mut genre = String::from("unknown");
     let mut creator = String::from("unknown");
     let mut title_override = title.to_string();
 
     match ffmpeg::format::input(path) {
         Ok(context) => {
             for (k, v) in context.metadata().iter() {
+                println!("Metadata {},{}", k, v);
                 match k.to_lowercase().as_str() {
                     "title" => title_override = v.to_string(),
-                    "creator" => creator = v.to_string(),
-                    "location" => location = v.to_string(),
+                    "artist" => creator = v.to_string(),
+                    "genre" => genre = v.to_string(),
                     _ => {},
                 }
             }
@@ -121,7 +122,7 @@ pub fn read_metadata(title: &str, file: &NamedTempFile) -> VideoMetadata {
     VideoMetadata {
         title: title_override,
         creator,
-        location,
+        genre,
     }
 }
 
@@ -129,5 +130,5 @@ pub fn read_metadata(title: &str, file: &NamedTempFile) -> VideoMetadata {
 
 //Debug Function
 fn print_md(md :&VideoMetadata) {
-    println!("title: {} \ncreators: {} \nlocation: {} \n", md.title, md.creator, md.location)
+    println!("title: {} \ncreators: {} \ngenre: {} \n", md.title, md.creator, md.genre)
 }
