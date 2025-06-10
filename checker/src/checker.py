@@ -8,7 +8,9 @@ from httpx import AsyncClient, Response
 from names import adjectives, content_types, cities, countries
 import ffmpeg
 from bs4 import BeautifulSoup
-
+import subprocess
+from pathlib import Path
+from requests_toolbelt.multipart.encoder import MultipartEncoder
 
 from typing import Optional
 from logging import LoggerAdapter
@@ -110,45 +112,47 @@ def get_random_thumbnail_path(path="thumbnails") -> str:
 def create_video_with_metadata(creator: str, location, title,logger, is_exploit=False):
     """change metadata of video so it can be exploited later with ffmpeg"""
     if is_exploit:
-        path = 'exploit.mp4'
+        path = f'/tmp/exploit_{title}_{random.randint(1000,9999)}.mp4'
     else:
-        path = 'metadata_video.mp4'
+        path = f'/tmp/metadata_{title}_{random.randint(1000,9999)}.mp4'
     video_path = get_random_video_path()
     
     logger.info(f"Changing the metadata of the Video {title} with location {location} from creator {creator} saved at {path}, from the video \n {video_path}")
     
-    ffmpeg.input(video_path).output(
-    path,
-    **{
-        'metadata': f'title={title}',
-        'metadata:': f'location={location}',
-        'metadata': f'creator={creator}'
-    }
-    ).overwrite_output().run()
+    cmd = [
+        "ffmpeg",
+        "-i", video_path,
+        "-metadata", f"title={title}",
+        "-metadata", f"artist={creator}",
+        "-metadata", f"genre={location}",
+        "-codec", "copy",  # Don't re-encode video
+        path
+    ]
+
+    subprocess.run(cmd, check=True)
+    # mp4_path = path.replace(".mkv", ".mp4")
+    # os.rename(path, mp4_path)
     logger.info("Metdata_video build successfully")
+    return path
   
     
 
-async def upload_private_video(client: AsyncClient, description, location, title, logger, is_exploit=False)-> str:
+async def upload_private_video(client: AsyncClient, description, location, title, logger, path)-> str:
    """Upload a private video, description is the flag store"""
    logger.info(f"uploading a private video")
-   if is_exploit:
-       path = "exploit.mp4"
-   else:
-       path = "metadata_video.mp4"
-   
-   multiform_data = {
-        "name": (None,title),
-        "description": (None,description),
-        "is_private": (None,"1"),
-        
-        "file": ("video", open(path,"rb"), "video/mp4"),
-        "thumbnail": ("thumbnail", open(get_random_thumbnail_path(),"rb"), "image/png"),
-        "location": (None,location)
-        
+   with open(path, "rb") as video_file, open(get_random_thumbnail_path(), "rb") as thumb:
+    files = {
+        "name": (None, title),
+        "description": (None, description),
+        "is_private": (None, "1"),
+        "location": (None, location),
+        "file": (Path(path).name, video_file, "video/mp4"),
+        "thumbnail": ("thumbnail.png", thumb, "image/png"),
     }
-   logger.info("POST to create_video")
-   response = await client.post("/app/create_video", files=multiform_data)
+    
+    logger.info(f"Uploading file {Path(path).name}, from path {path}")
+    response = await client.post("/app/create_video", files=files)
+   
    status_code = response.status_code
    if status_code == 404:
         logger.info(f"Client error {status_code} with {response.text}")
@@ -166,7 +170,7 @@ CHECKER FUNCTIONS
 """
 
 @checker.putflag(0)
-async def putflag_note(
+async def putflag_video(
     task: PutflagCheckerTaskMessage,
     db: ChainDB,
     client: AsyncClient,
@@ -190,38 +194,46 @@ async def putflag_note(
     location = generate_location()
     description: str  = task.flag
     logger.debug(f"Creating video with right metadata for exploit")
-    create_video_with_metadata(creator=username, location=location, title=title,logger=logger)
-    logger.debug(f"Saving flag")
-    url = await upload_private_video(client, description, location, title, logger)
+    path = create_video_with_metadata(creator=username, location=location, title=title,logger=logger)
+    logger.debug(f"Saving flag in video {title} location: {location}, description(flag): {description}")
+    await upload_private_video(client, description, location, title, logger, path)
     
 
     #save flag and userdata
-    await db.set("userdata", (username, password, url, title))
+    await db.set("userdata", (username, password, title, description))
 
     return username
 
 @checker.getflag(0)
-async def getflag_note(
+async def getflag_video(
     task: GetflagCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, client: AsyncClient
 ) -> None:
     try:
-        username, password, url, title = await db.get("userdata")
+        username, password,title, description = await db.get("userdata")
     except KeyError:
         raise MumbleException("Missing database entry from putflag")
 
-    logger.debug(f"getflag(0) for the user {username} and video {title}")
+    logger.debug(f"getflag(0) for the user {username} and video {title} flag should be {description}")
     await login(client, username, password,logger)
 
     logger.info(f"try to access flag in /app/myprofile")
     response = await client.get("/get_my_videos")
-    logger.debug(response.text)
+    logger.debug("response.text is: " + response.text)
     assert_in(task.flag, response.text, "Flag missing")
         
 
+# @checker.putnoise(0)
+# async def putnoise_video()
 
+# @checker.getnoise(0)
+# async def getnoise_video()
+
+# @checker.havoc(0)
+
+# @checker.havoc(1)
 
 @checker.exploit(0)
-async def exploit0(task: ExploitCheckerTaskMessage, searcher: FlagSearcher, client: AsyncClient, logger:LoggerAdapter) -> Optional[str]:
+async def exploit_video(task: ExploitCheckerTaskMessage, searcher: FlagSearcher, client: AsyncClient, logger:LoggerAdapter) -> Optional[str]:
     username_attacker: str = "".join(
         random.choices(string.ascii_uppercase + string.digits, k=12)
     )
@@ -248,8 +260,8 @@ async def exploit0(task: ExploitCheckerTaskMessage, searcher: FlagSearcher, clie
     title = video.get("name")
     location = video.get("location")
     
-    create_video_with_metadata(username, location, title,logger, is_exploit=True)
-    await upload_private_video(client, "ist egal", "Berlin", title,logger, True)
+    path = create_video_with_metadata(username, location, title,logger, is_exploit=True)
+    await upload_private_video(client, "ist egal", "Berlin", title,logger, path)
     
     my_vid_response = await client.get("/get_my_videos")
     if my_vid_response.status_code != 200:
@@ -267,7 +279,7 @@ async def exploit0(task: ExploitCheckerTaskMessage, searcher: FlagSearcher, clie
     if video_response.status_code != 200:
         raise MumbleException()
     video_exploited = video_response.json()
-    
+    logger.info(f"Exploited video json: {video_exploited}")
     if flag := searcher.search_flag(video_exploited.get("description")):
         return flag
     raise MumbleException("flag not found")
