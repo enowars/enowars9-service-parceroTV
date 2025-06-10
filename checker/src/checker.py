@@ -70,8 +70,8 @@ async def login(client: AsyncClient, username:str, password: str, logger):
     if status_code in [303]:
         logger.info(f"Successfull login of user {username} with redirection {status_code} ")
     else:
-        logger.error(f"Failed Login of user {username} should be Unauthozired {status_code}")
-        raise MumbleException(f"Failed Login of user {username} should be Unauthozired {status_code}")
+        logger.error(f"Failed Login of user {username} status code: {status_code}")
+        raise MumbleException(f"Failed Login of user {username} with password: {password} should be Unauthozired {status_code}")
 
 def generate_title() -> str:
     adj = random.choice(adjectives)
