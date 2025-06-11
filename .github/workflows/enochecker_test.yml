@@ -1,6 +1,7 @@
 name: enochecker_test
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -14,6 +15,7 @@ jobs:
     env:
       ENOCHECKER_TEST_CHECKER_ADDRESS: localhost
       ENOCHECKER_TEST_CHECKER_PORT: 17777
+
     steps:
     - uses: actions/checkout@v2
       with:
