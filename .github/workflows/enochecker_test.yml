@@ -33,6 +33,7 @@ jobs:
         cd service
         docker compose up --build --force-recreate -d
         ls -la
+        ls data
     - name: start checker
       run: |
         cd checker
