@@ -57,7 +57,7 @@ jobs:
       run: |
         cd service
         CONTAINER_ID=$(docker compose ps -q parcerotv)
-        docker cp "$CONTAINER_ID":/service/data/. ./datadir/
+        docker cp "$CONTAINER_ID":/service/data/. ../datadir/
     - name: Tar logs
       if: failure()
       run: tar cvzf ./logs.tgz ./logs ./datadir
