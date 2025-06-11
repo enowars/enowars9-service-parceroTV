@@ -5,4 +5,3 @@ faker
 httpx
 ffmpeg-python
 bs4
-requests_toolbelt

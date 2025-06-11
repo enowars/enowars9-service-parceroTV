@@ -10,7 +10,6 @@ import ffmpeg
 from bs4 import BeautifulSoup
 import subprocess
 from pathlib import Path
-from requests_toolbelt.multipart.encoder import MultipartEncoder
 
 from typing import Optional
 from logging import LoggerAdapter
