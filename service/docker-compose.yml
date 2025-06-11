@@ -3,6 +3,8 @@ services:
     build: .
     # The code should be copied into the container using COPY.
     # Mount the data folder writable, so that information can be persisted across restarts.
+    environment:
+      - DATABASE_PATH=/service/data/parcerotv.db
     volumes:
       - ./data/:/service/data:rw
     # Define the port mapping (external:internal port)
