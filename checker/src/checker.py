@@ -5,7 +5,7 @@ import string
 import faker
 import os
 from httpx import AsyncClient, Response
-from names import adjectives, content_types, cities, countries
+from names import adjectives, content_types, cities, countries, german_proverbs
 import ffmpeg
 from bs4 import BeautifulSoup
 import subprocess
@@ -76,13 +76,19 @@ async def login(client: AsyncClient, username:str, password: str, logger):
 def generate_title() -> str:
     adj = random.choice(adjectives)
     content = random.choice(content_types)
-    number = random.randint(1, 10000)
+    number = random.randint(1, 1000000)
     return f"{adj}-{content}-{number}"
 
 def generate_location() -> str:
     country = random.choice(countries)
     city = random.choice(cities)
     return f"{country}, {city}"
+
+def generate_description() -> str:
+    return f"{random.choice(german_proverbs)} {random.randint(1, 10)}"
+
+def generate_about() -> str:
+    return "aasd"
 
 def get_random_video_path(path="videos") -> str:
     video_extensions = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".flv"}
@@ -136,7 +142,6 @@ def create_video_with_metadata(creator: str, location, title,logger, is_exploit=
     return path
   
     
-
 async def upload_private_video(client: AsyncClient, description, location, title, logger, path)-> str:
    """Upload a private video, description is the flag store"""
    logger.info(f"uploading a private video")
@@ -165,6 +170,33 @@ async def upload_private_video(client: AsyncClient, description, location, title
    else:
        raise MumbleException(f"failed to upload video {title}, with location: {location}")
 
+
+async def upload_public_video(client: AsyncClient, logger, title, description):
+    video_path = get_random_video_path()
+    thumbnail_path = get_random_thumbnail_path()
+    with open(video_path, "rb") as video_file, open(thumbnail_path, "rb") as thumb:
+        files = {
+        "name": (None, title),
+        "description": (None, description),
+        "is_private": (None, "0"),
+        "location": (None, generate_location()),
+        "file": (Path(video_path).name, video_file, "video/mp4"),
+        "thumbnail": ("thumbnail.png", thumb, "image/png"),
+    }
+        logger.info(f"Uploading public video {video_path}")
+        response = await client.post("/app/create_video", files=files)
+    status_code = response.status_code
+    if status_code == 404:
+        logger.info(f"Client error {status_code} with {response.text}")
+   
+    if status_code in [303]:
+       logger.info(f"Video was succesfully uploaded")
+       redirect_url = response.headers.get("Location")
+       logger.info(f"Redirected to: {redirect_url}")
+       return redirect_url 
+    else:
+       raise MumbleException(f"failed to upload public video {title}")
+    
 """
 CHECKER FUNCTIONS
 """
@@ -222,15 +254,110 @@ async def getflag_video(
     assert_in(task.flag, response.text, "Flag missing")
         
 
-# @checker.putnoise(0)
-# async def putnoise_video()
+@checker.putnoise(0)
+async def putnoise_video(task: PutnoiseCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, client: AsyncClient):
+    logger
+    username: str = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+    password: str = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
 
-# @checker.getnoise(0)
-# async def getnoise_video()
+    logger.debug(f"Connecting to service")
+    # Register a new user
+    await signup(client,username, password,logger)
+    # Login
+    await login(client, username, password,logger)
 
-# @checker.havoc(0)
+    #Create Data for video
+    title = generate_title()
+    description = generate_description()
+    await upload_public_video(client, logger, title, description)
+    
+    await db.set('information', (username, password, title, description))
+   
 
-# @checker.havoc(1)
+@checker.getnoise(0)
+async def getnoise_video(task: GetnoiseCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, client: AsyncClient):
+    logger.info(f"Getnoise 0 (video) {client.base_url}")
+    try:
+        username, password, title, description = await db.get('information')
+    except:
+        logger.error("Putnoise 0 (video) failed : DB couldnt get information")
+        raise MumbleException('Putnoise(0) failed')
+    
+    await login(client, username, password, logger)
+    response = await client.get("/get_my_videos")
+    logger.debug("response.text is: " + response.text)
+    assert_in(description, response.text, "Flag missing")
+    
+    
+@checker.putnoise(1)
+async def putnoise_profile_description(task: PutnoiseCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, client: AsyncClient):
+    username: str = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+    password: str = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+
+    logger.debug(f"Connecting to service")
+    # Register a new user
+    await signup(client,username, password,logger)
+    # Login
+    await login(client, username, password,logger)
+    
+    about = {"about":generate_about()}
+    
+    response = await client.post("/update_about", data=about)
+    
+    if response.status_code != 303:
+        logger.error(f"/update about should return 303 but returned {response.status_code}")
+        raise MumbleException("/update_about didn't work")
+    
+    await db.set('information1', (username, password, about))
+    
+
+@checker.getnoise(1)
+async def getnoise_profile_description(task: GetnoiseCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, client: AsyncClient):
+    logger.info(f"Getnoise 1 (description) {client.base_url}")
+    try:
+        username, password, about = await db.get('information1')
+    except:
+        logger.error("Putnoise 1 (description) failed : DB couldnt get information")
+        raise MumbleException('Putnoise(1) failed')
+    
+    await login(client, username, password, logger)
+    
+    response = await client.get("get_my_profile")
+    if response.status_code != 200:
+        raise MumbleException()
+    
+    json = response.json()
+    logger.info(f"Json Response about is {json} {response}")
+    about_in_response = json.get("about")
+    
+    if about_in_response != about.get("about"):
+        raise MumbleException(f"About in profile and about that was saved are different {about} != {about_in_response}")
+    
+    logger.info("getnoise(1) (description) worked fine")
+    
+    
+    
+
+    
+
+@checker.havoc(0)
+async def havoc_failed_login(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
+    pass
+@checker.havoc(1)
+async def havoc_get_logo(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
+    pass
+
+@checker.havoc(2)
+async def havoc_get_video(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
+    pass
 
 @checker.exploit(0)
 async def exploit_video(task: ExploitCheckerTaskMessage, searcher: FlagSearcher, client: AsyncClient, logger:LoggerAdapter) -> Optional[str]:
