@@ -52,9 +52,15 @@ jobs:
       uses: jwalton/gh-docker-logs@v1
       with:
         dest: './logs'
+    - name: Dump data dir on failure
+      if: failure()
+      run: |
+        cd service
+        CONTAINER_ID=$(docker compose ps -q parcerotv)
+        docker cp "$CONTAINER_ID":/service/data/. ./datadir/
     - name: Tar logs
       if: failure()
-      run: tar cvzf ./logs.tgz ./logs
+      run: tar cvzf ./logs.tgz ./logs ./datadir
     - name: Upload logs to GitHub
       if: failure()
       uses: actions/upload-artifact@master
