@@ -31,12 +31,14 @@ jobs:
     - name: start service
       run: |
         cd service
+        docker compose down --remove-orphans
         docker compose up --build --force-recreate -d
         ls -la
-        ls data
+        ls -la data
     - name: start checker
       run: |
         cd checker
+        docker compose down --remove-orphans
         docker compose up --build --force-recreate -d
         ls -la
     - name: obtain Docker host IP
