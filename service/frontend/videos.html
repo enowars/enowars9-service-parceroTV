@@ -1,31 +1,39 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <title>Watch Video</title>
   <script src="/js/videos.js"></script>
+  <link rel="stylesheet" href="/css/videos.css" />
+  <link rel="stylesheet" href="/css/navigation.css" />
   <base href="/" />
 </head>
-<body>
-  <h1 id="name"></h1>
 
-  <video id="video-player" width="720" controls>
-    <source id="video-source" src="" type="video/mp4">
-    Your browser does not support the video tag.
-  </video>
-  <p id="description"></p>
-  <div class="comment-box">
-    
-    <h4 id="commentHeader">Leave a Comment</h4>
-    <form action="/post_comment" method="post" id="commentForm">
+<body>
+  <div id="body" class="body">
+    <div id="header" class="header"></div>
+    <h1 id="name"></h1>
+
+    <video id="video-player" width="720" controls>
+      <source id="video-source" src="" type="video/mp4">
+      Your browser does not support the video tag.
+    </video>
+    <p id="description"></p>
+    <div class="comment-box">
+
+      <h4 id="commentHeader">Leave a Comment</h4>
+      <form action="/post_comment" method="post" id="commentForm">
         <input type="hidden" id="videoID" name="video_id" value="">
-      <textarea name="comment" id="comment" rows="4" placeholder="Write your comment here..." required></textarea>
-      <br>
-      <button type="submit">Post Comment</button>
-    </form>
-  
-    <div id="commentList"></div>
+        <textarea name="comment" id="comment" rows="4" placeholder="Write your comment here..." required></textarea>
+        <br>
+        <button type="submit">Post Comment</button>
+      </form>
+
+      <div id="commentList"></div>
+    </div>
+    <div id="footer" class="footer"></div>
   </div>
-  
 </body>
+
 </html>

@@ -1,21 +1,29 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ParcerroTV – Login</title>
+  <link rel="stylesheet" href="css/loginregister.css">
 </head>
 <body>
-    <h1>Login</h1>
+  <div class="container">
+    <img src="/assets/ParcerroTV.svg" alt="ParcerroTV" class="logo" />
     <form action="/checkcredentials" method="POST">
-        <label for="username">Username:</label>
-        <input type="text" id="username" name="username" required>
-        <br>
-        <label for="password">Password:</label>
-        <input type="password" id="password" name="password" required>
-        <br>
-        <button type="submit">Login</button>
+      <label for="username">Username:</label>
+      <input type="text" id="username" name="username" required />
+
+      <label for="password">Password:</label>
+      <input type="password" id="password" name="password" required />
+
+      <button type="submit">Sign In</button>
     </form>
-    <a href="/register">No Acccount? Sign Up!</a>
+
+    <a href="/register" class="alt-link">No account? Create one!</a>
+
+    <div class="footer">
+      © 2006 ParceroTV
+    </div>
+  </div>
 </body>
 </html>

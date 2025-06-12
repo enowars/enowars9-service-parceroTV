@@ -119,7 +119,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
                 const p = document.createElement("p");
                 p.className = "video-location"
-                p.textContent = video.location;
+                p.textContent = "Genre:\n \n" + video.location;
 
                 const hr = document.createElement("hr");
 
@@ -136,6 +136,12 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
     init();
+    fetch("/header")
+        .then(res => res.text())
+        .then(html => document.getElementById("header").innerHTML = html);
 
+    fetch("/footer")
+        .then(res => res.text())
+        .then(html => document.getElementById("footer").innerHTML = html);
 
 });
