@@ -31,6 +31,8 @@ COPY /backend/src/ /service/backend/src
 COPY /backend/Cargo.toml /service/backend
 COPY /frontend/ /service/frontend 
 
+#Copy CleanUp
+COPY cleanup.py service/cleanup.py
 
 # Change the working directory.
 WORKDIR /service/backend/

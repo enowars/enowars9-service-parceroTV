@@ -2,3 +2,5 @@ data
 *.mp4
 .DS_store
 *.DS_store
+NUL
+*/target/
