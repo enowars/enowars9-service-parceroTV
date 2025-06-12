@@ -5,6 +5,13 @@ use std::fs::{self, File};
 use std::io::{self, Write, Read};
 use std::path::Path;
 
+#[derive(Debug, Hash)]
+pub struct VideoMetadata {
+    pub title: String,
+    pub creator: String,
+    pub genre: String,
+}
+
 pub fn get_path(is_private: u32, title: &str, file: &NamedTempFile) -> String {
     
     let mut path = String::from("");
@@ -18,8 +25,6 @@ pub fn get_path(is_private: u32, title: &str, file: &NamedTempFile) -> String {
     let md = read_metadata(title, file);
     path.push_str(&calculate_hash(&md).to_string());
     path.push_str(".mp4");
-    println!("The path is {}", path);
-    print_md(&md);
     path
 }
 
@@ -29,8 +34,6 @@ pub fn get_thumbnail_path(title: &str, file: &NamedTempFile) -> String {
     let md = read_metadata(title, file);
     path.push_str(&calculate_hash(&md).to_string());
     path.push_str(".png");
-    println!("The path is {}", path);
-    print_md(&md);
     path
 }
 
@@ -41,7 +44,6 @@ pub fn save_video(path: &str, mut file: File) -> io::Result<()> {
     let target_path = Path::new(&data_path);
 
     if target_path.exists() {
-        println!("File already exists at path: {}", path);
         return Ok(());
     }
 
@@ -54,7 +56,6 @@ pub fn save_video(path: &str, mut file: File) -> io::Result<()> {
     let mut output = File::create(target_path)?;
     output.write_all(&buffer)?;
 
-    println!("File saved at: {}", path);
     Ok(())
 }
 
@@ -65,7 +66,6 @@ pub fn save_thumbnail(thumbnail_path: &str, mut thumbnail_file: File) -> io::Res
     let target_path = Path::new(&data_path);
 
     if target_path.exists() {
-        println!("File already exists at path: {}", thumbnail_path);
         return Ok(());
     }
 
@@ -78,7 +78,6 @@ pub fn save_thumbnail(thumbnail_path: &str, mut thumbnail_file: File) -> io::Res
     let mut output = File::create(target_path)?;
     output.write_all(&buffer)?;
 
-    println!("File saved at: {}", thumbnail_path);
     Ok(())
 }
 
@@ -88,12 +87,7 @@ fn calculate_hash<T: Hash>(t: &T) -> u64 {
     s.finish()
 }
 
-#[derive(Debug, Hash)]
-pub struct VideoMetadata {
-    pub title: String,
-    pub creator: String,
-    pub genre: String,
-}
+
 
 pub fn read_metadata(title: &str, file: &NamedTempFile) -> VideoMetadata {
     ffmpeg::init().unwrap();
@@ -106,7 +100,6 @@ pub fn read_metadata(title: &str, file: &NamedTempFile) -> VideoMetadata {
     match ffmpeg::format::input(path) {
         Ok(context) => {
             for (k, v) in context.metadata().iter() {
-                println!("Metadata {},{}", k, v);
                 match k.to_lowercase().as_str() {
                     "title" => title_override = v.to_string(),
                     "artist" => creator = v.to_string(),
@@ -124,11 +117,4 @@ pub fn read_metadata(title: &str, file: &NamedTempFile) -> VideoMetadata {
         creator,
         genre,
     }
-}
-
-
-
-//Debug Function
-fn print_md(md :&VideoMetadata) {
-    println!("title: {} \ncreators: {} \ngenre: {} \n", md.title, md.creator, md.genre)
 }

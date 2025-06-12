@@ -21,7 +21,6 @@ pub fn create_user(conn: Connection, name: &str, password: &str) -> Result<()> {
         "INSERT INTO users (name, password) VALUES (?1, ?2)",
         (name,password),
     )?;
-    println!("{name}{password}");
     Ok(())
 }
 
@@ -42,7 +41,6 @@ pub fn get_all_videos(conn: Connection) -> Result<Vec<VideoInfo>> {
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
-    println!("get_all_videos");
     Ok(videos)
 }
 
@@ -63,7 +61,6 @@ pub fn select_my_videos(conn: Connection, user_id: &i32) -> Result<Vec<VideoInfo
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
-    println!("select_my_videos");
     Ok(videos)
 }
 
@@ -84,7 +81,6 @@ pub fn select_videos_by_userid(conn: Connection, user_id: i32) -> Result<Vec<Vid
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
-    println!("get_all_videos");
     Ok(videos)
 }
 
@@ -102,7 +98,6 @@ pub fn select_private_videos_by_userid(conn: Connection, user_id: i32) -> Result
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
-    println!("get_all_videos");
     Ok(videos)
 }
 
@@ -148,7 +143,6 @@ ORDER BY comments.created_at DESC;")?;
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
-    println!("get_all_videos");
     Ok(comments)
 }
 
@@ -173,7 +167,6 @@ pub fn select_user_id(conn: Connection, name: &str) -> Result<i32> {
         |row| row.get(0),
     )?;
     
-    println!("User '{}' has ID {}", name, user_id);
     Ok(user_id)
 }
 
@@ -213,7 +206,6 @@ pub fn select_password(conn:Connection, name: &str) -> Result<Option<String>> {
         params![name],
         |row| row.get(0),
     ).optional()?;
-    println!("{name}");
     Ok(password)
 }
 

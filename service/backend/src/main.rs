@@ -78,7 +78,6 @@ async fn check_credentials(
     let name = form.username.clone();
     let name_clone = name.clone();
     let typed_password = form.password.clone();
-    println!("{name} {typed_password}");
     let maybe_password = web::block(move || select_password(conn, &name))
         .await?
         .map_err(error::ErrorInternalServerError)?;
@@ -115,7 +114,6 @@ async fn newuser(
     let conn = get_db_conn(&pool).await?;
     let name = form.username.clone();
     let password = form.password.clone();
-    println!("{name} {password}");
     let _ = web::block(move || create_user(conn, &name, &password))
         .await?
         .map_err(error::ErrorInternalServerError);
@@ -181,11 +179,6 @@ async fn private_videos(
             web::block(move || user_has_permission(&conn, &user_id, &private_path))
                 .await?
                 .map_err(ErrorInternalServerError)?;
-
-        println!(
-            "Has permission {} for user {} with path {}",
-            &has_permission, &user_id, &path_clone
-        );
         if !has_permission {
             return Ok(
                 HttpResponse::Unauthorized().body("You have no permission to see this video")
@@ -204,9 +197,7 @@ async fn create_video(
     session: Session,
     MultipartForm(video_form): MultipartForm<VideoForm>,
 ) -> Result<impl Responder, Error> {
-    println!("We are here");
     if let Ok(Some(user_id)) = session.get::<u32>("user_id") {
-        println! {"Video Form, Title {}, Desc.: {}, ",*video_form.name, *video_form.description};
         let file_to_save = video_form.file.file.reopen()?;
         let thumbnail_to_save = video_form.thumbnail.file.reopen()?;
         let path = get_path(
@@ -250,7 +241,6 @@ async fn post_comment(
     form: web::Form<CommentForm>,
     req: HttpRequest,
 ) -> Result<impl Responder, Error> {
-    println!("post_comment");
     if let Ok(Some(user_id)) = session.get::<i32>("user_id") {
         let conn = get_db_conn(&pool).await?;
         let comment_form = form.into_inner();
@@ -290,7 +280,6 @@ async fn fetch_all_videos(
     pool: web::Data<Pool>,
     session: Session,
 ) -> Result<impl Responder, Error> {
-    println!("/api/fetch_all_videos");
     if let Ok(Some(_user_id)) = session.get::<i32>("user_id") {
         let conn = get_db_conn(&pool).await?;
 
@@ -308,7 +297,6 @@ async fn get_my_videos(
     pool: web::Data<Pool>,
     session: Session,
 ) -> Result<impl Responder, Error> {
-    println!("/api/fetch_all_videos");
     if let Ok(Some(user_id)) = session.get::<i32>("user_id") {
         let conn = get_db_conn(&pool).await?;
 
@@ -327,7 +315,6 @@ async fn get_videos_by_userid(
     session: Session,
     user_id: web::Path<i32>
 ) -> Result<impl Responder, Error> {
-    println!("get_videos");
     if let Ok(Some(_user_id)) = session.get::<i32>("user_id") {
         let conn = get_db_conn(&pool).await?;
         let user_id = user_id.into_inner();
@@ -346,7 +333,6 @@ async fn get_private_videos_by_userid(
     session: Session,
     user_id: web::Path<i32>
 ) -> Result<impl Responder, Error> {
-    println!("get_private_videos");
     if let Ok(Some(_user_id)) = session.get::<i32>("user_id") {
         let conn = get_db_conn(&pool).await?;
         let user_id = user_id.into_inner();
@@ -365,7 +351,6 @@ async fn get_comments(
     session: Session,
     video_id: web::Path<i32>
 ) -> Result<impl Responder, Error> {
-    println!("get_comments");
     if let Ok(Some(_user_id)) = session.get::<i32>("user_id") {
         let conn = get_db_conn(&pool).await?;
         let video_id = video_id.into_inner();
@@ -384,7 +369,6 @@ async fn get_user_info(
     session: Session,
     id: web::Path<i32>,
 ) -> Result<impl Responder, Error> {
-    println!("User info called");
     if let Ok(Some(_user_id)) = session.get::<i32>("user_id") {
         let conn = get_db_conn(&pool).await?;
         let id = id.into_inner();
@@ -403,7 +387,6 @@ async fn get_user_info_with_name(
     session: Session,
     name: web::Path<String>,
 ) -> Result<impl Responder, Error> {
-    println!("User info called");
     if let Ok(Some(_user_id)) = session.get::<i32>("user_id") {
         let conn = get_db_conn(&pool).await?;
         let name = name.into_inner();
@@ -422,7 +405,6 @@ async fn get_video_info(
     session: Session,
     path: web::Path<String>,
 ) -> Result<impl Responder, Error> {
-    println!("/get_video_info/{}", &path);
     if let Ok(Some(user_id)) = session.get::<i32>("user_id") {
         let conn = get_db_conn(&pool).await?;
         let has_permission = if path.starts_with("videos/") {
@@ -509,7 +491,6 @@ async fn main() -> std::io::Result<()> {
             .service(Files::new("/assets", "../frontend/assets/").show_files_listing())
             .service(Files::new("/videos", "../data/videos/").show_files_listing())
             .service(Files::new("/thumbnails", "../data/thumbnails/").show_files_listing())
-            .service(Files::new("/private", "../data/private/").show_files_listing())
             .service(
                 web::scope("/app")
                     .service(profile)
