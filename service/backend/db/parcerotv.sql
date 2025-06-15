@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS users (
     UserID INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     name TEXT UNIQUE NOT NULL CHECK(length(name) <= 20),
     password TEXT NOT NULL CHECK(length(password) <= 200),
+    created_at TEXT DEFAULT (datetime('now')),
     about TEXT CHECK(length(about) <= 2000)
 );
 

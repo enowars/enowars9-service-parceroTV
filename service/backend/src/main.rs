@@ -5,6 +5,8 @@ use std::path::PathBuf;
 use actix_files::Files;
 use actix_files::NamedFile;
 use actix_multipart::form::MultipartForm;
+use actix_session::config::PersistentSession;
+use actix_web::cookie::time::Duration;
 use actix_web::http::header;
 use actix_web::HttpRequest;
 use actix_web::error::ErrorInternalServerError;
@@ -41,6 +43,9 @@ use actix_session::{Session, SessionMiddleware};
 use actix_web::cookie::{Key, SameSite};
 use db::{Pool, create_user, get_db_conn, insert_video, select_password};
 
+
+const SESSION_LIFETIME_MINUTES: i64 = 15;
+
 macro_rules! redirect {
     ($path:expr) => {
         HttpResponse::SeeOther()
@@ -50,21 +55,12 @@ macro_rules! redirect {
 }
 
 #[get("/")]
-async fn hello(session: Session) -> Result<HttpResponse, Error> {
+async fn start_page(session: Session) -> Result<HttpResponse, Error> {
     if let Ok(Some(_user_id)) = session.get::<u32>("user_id") {
         Ok(redirect!("/app/home"))
     } else {
         Ok(redirect!("/login"))
     }
-}
-
-#[post("/echo")]
-async fn echo(req_body: String) -> impl Responder {
-    HttpResponse::Ok().body(req_body)
-}
-
-async fn manual_hello() -> impl Responder {
-    HttpResponse::Ok().body("Hey there!")
 }
 
 #[post("/checkcredentials")]
@@ -118,7 +114,7 @@ async fn newuser(
         .await?
         .map_err(error::ErrorInternalServerError);
 
-    Ok(HttpResponse::Ok().body("User created!"))
+    Ok(redirect!("/login"))
 }
 
 async fn serve_file_or_reject(session: Session, path: &str) -> Result<impl Responder, Error> {
@@ -129,7 +125,7 @@ async fn serve_file_or_reject(session: Session, path: &str) -> Result<impl Respo
             .content_type("text/html")
             .body(html_content))
     } else {
-        Ok(HttpResponse::Unauthorized().body("Please log in"))
+        Ok(redirect!("/"))
     }
 }
 
@@ -187,7 +183,7 @@ async fn private_videos(
         let file_path = PathBuf::from(format!("../data/{}", path_clone));
         return Ok(NamedFile::open(file_path)?.into_response(&req));
     } else {
-        Ok(HttpResponse::Unauthorized().body("Please log in"))
+        Ok(redirect!("/"))
     }
 }
 
@@ -230,7 +226,7 @@ async fn create_video(
         save_video(&path_clone, file_to_save)?;
         Ok(redirect!("/app/home"))
     } else {
-        Ok(HttpResponse::Unauthorized().body("Please log in"))
+        Ok(redirect!("/"))
     }
 }
 
@@ -270,7 +266,7 @@ async fn post_comment(
         .append_header((header::LOCATION, referer))
         .finish())
     } else {
-        Ok(HttpResponse::Unauthorized().body("Please log in"))
+        Ok(redirect!("/"))
     }
 }
 
@@ -288,7 +284,7 @@ async fn fetch_all_videos(
             .map_err(error::ErrorInternalServerError)?;
         Ok(HttpResponse::Ok().json(videoss))
     } else {
-        Ok(HttpResponse::Unauthorized().body("Please log in"))
+        Ok(redirect!("/"))
     }
 }
 
@@ -305,7 +301,7 @@ async fn get_my_videos(
             .map_err(error::ErrorInternalServerError)?;
         Ok(HttpResponse::Ok().json(videoss))
     } else {
-        Ok(HttpResponse::Unauthorized().body("Please log in"))
+        Ok(redirect!("/"))
     }
 }
 
@@ -323,7 +319,7 @@ async fn get_videos_by_userid(
             .map_err(error::ErrorInternalServerError)?;
         Ok(HttpResponse::Ok().json(videoss))
     } else {
-        Ok(HttpResponse::Unauthorized().body("Please log in"))
+        Ok(redirect!("/"))
     }
 }
 
@@ -341,7 +337,7 @@ async fn get_private_videos_by_userid(
             .map_err(error::ErrorInternalServerError)?;
         Ok(HttpResponse::Ok().json(videoss))
     } else {
-        Ok(HttpResponse::Unauthorized().body("Please log in"))
+        Ok(redirect!("/"))
     }
 }
 
@@ -359,7 +355,7 @@ async fn get_comments(
             .map_err(error::ErrorInternalServerError)?;
         Ok(HttpResponse::Ok().json(comments))
     } else {
-        Ok(HttpResponse::Unauthorized().body("Please log in"))
+        Ok(redirect!("/"))
     }
 }
 
@@ -377,7 +373,7 @@ async fn get_user_info(
             .map_err(error::ErrorInternalServerError)?;
         Ok(HttpResponse::Ok().json(user_info))
     } else {
-        Ok(HttpResponse::Unauthorized().body("Please log in"))
+        Ok(redirect!("/"))
     }
 }
 
@@ -395,7 +391,7 @@ async fn get_user_info_with_name(
             .map_err(error::ErrorInternalServerError)?;
         Ok(HttpResponse::Ok().json(user_info))
     } else {
-        Ok(HttpResponse::Unauthorized().body("Please log in"))
+        Ok(redirect!("/"))
     }
 }
 
@@ -421,7 +417,7 @@ async fn get_video_info(
             Ok(HttpResponse::Ok().json(video_info))
         }
     } else {
-        Ok(HttpResponse::Unauthorized().body("Please log in"))
+        Ok(redirect!("/"))
     }
 }
 
@@ -435,7 +431,7 @@ async fn get_my_profile(session: Session, pool: web::Data<Pool>) -> Result<impl 
         Ok(HttpResponse::Ok().json(user_info))
     }
         else {
-            Ok(HttpResponse::Unauthorized().body("Please log in"))
+            Ok(redirect!("/"))
         }
 }
 
@@ -450,7 +446,7 @@ async fn update_about(session: Session, pool: web::Data<Pool>, aboutform:web::Fo
         Ok(redirect!("app/myprofile"))
     }
         else {
-            Ok(HttpResponse::Unauthorized().body("Please log in"))
+            Ok(redirect!("/"))
         }
 }
 
@@ -458,7 +454,7 @@ fn session_middleware() -> SessionMiddleware<CookieSessionStore> {
     SessionMiddleware::builder(CookieSessionStore::default(), Key::from(&[0; 64]))
         .cookie_name(String::from("session"))
         .cookie_secure(false)
-        .session_lifecycle(BrowserSession::default())
+        .session_lifecycle(PersistentSession::default().session_ttl(Duration::minutes(SESSION_LIFETIME_MINUTES)))
         .cookie_same_site(SameSite::Strict)
         .cookie_content_security(CookieContentSecurity::Private)
         .cookie_http_only(true)
@@ -476,10 +472,8 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .wrap(session_middleware())
             .app_data(web::Data::new(pool.clone()))
-            .service(hello)
-            .service(echo)
-            .route("/hey", web::get().to(manual_hello))
             .service(newuser)
+            .service(start_page)
             .service(check_credentials)
             .service(private_videos)
             .service(Files::new("/login", "../frontend").index_file("login.html"))

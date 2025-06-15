@@ -4,6 +4,7 @@ use tempfile::NamedTempFile;
 use std::fs::{self, File};
 use std::io::{self, Write, Read};
 use std::path::Path;
+use regex::Regex;
 
 #[derive(Debug, Hash)]
 pub struct VideoMetadata {
@@ -11,6 +12,22 @@ pub struct VideoMetadata {
     pub creator: String,
     pub genre: String,
 }
+
+
+
+fn sanitize_title(title: &str, is_video: bool) -> &str {
+    let re = Regex::new(r"^[a-zA-Z0-9_-]+$").unwrap();
+    if re.is_match(title) {
+        title
+    } else {
+        if is_video {
+            return "some-video";
+        } else {
+            return "some-thumbnail";
+        }
+    }
+}
+
 
 pub fn get_path(is_private: u32, title: &str, file: &NamedTempFile) -> String {
     
@@ -21,7 +38,7 @@ pub fn get_path(is_private: u32, title: &str, file: &NamedTempFile) -> String {
     else {
         path.push_str("videos/");
     }
-    path.push_str(title);
+    path.push_str(sanitize_title(title, true));
     let md = read_metadata(title, file);
     path.push_str(&calculate_hash(&md).to_string());
     path.push_str(".mp4");
@@ -30,7 +47,7 @@ pub fn get_path(is_private: u32, title: &str, file: &NamedTempFile) -> String {
 
 pub fn get_thumbnail_path(title: &str, file: &NamedTempFile) -> String {
     let mut path = String::from("thumbnails/");
-    path.push_str(title);
+    path.push_str(sanitize_title(title, false));
     let md = read_metadata(title, file);
     path.push_str(&calculate_hash(&md).to_string());
     path.push_str(".png");
