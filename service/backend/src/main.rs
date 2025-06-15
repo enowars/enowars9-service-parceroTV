@@ -4,14 +4,12 @@ use actix_files::Files;
 use actix_files::NamedFile;
 use actix_multipart::form::MultipartForm;
 use actix_session::config::PersistentSession;
+use actix_web::HttpRequest;
 use actix_web::cookie::time::Duration;
+use actix_web::error::ErrorInternalServerError;
 use actix_web::http::header;
 use actix_web::middleware;
-use actix_web::HttpRequest;
-use actix_web::error::ErrorInternalServerError;
-use actix_web::{
-    App, Error, HttpResponse, HttpServer, Responder, error, get, post, web,
-};
+use actix_web::{App, Error, HttpResponse, HttpServer, Responder, error, get, post, web};
 mod forms;
 use backend::get_path;
 use backend::get_thumbnail_path;
@@ -35,12 +33,11 @@ use forms::{CommentForm, FormInput, VideoForm};
 
 use r2d2_sqlite::SqliteConnectionManager;
 mod db;
-use actix_session::config::{CookieContentSecurity};
+use actix_session::config::CookieContentSecurity;
 use actix_session::storage::CookieSessionStore;
 use actix_session::{Session, SessionMiddleware};
 use actix_web::cookie::{Key, SameSite};
 use db::{Pool, create_user, get_db_conn, insert_video, select_password};
-
 
 const SESSION_LIFETIME_MINUTES: i64 = 15;
 
@@ -49,6 +46,16 @@ macro_rules! redirect {
         HttpResponse::SeeOther()
             .append_header(("Location", $path))
             .finish()
+    };
+}
+
+macro_rules! static_page {
+    ($route:expr, $file:expr) => {
+        actix_files::Files::new($route, "../frontend")
+            .index_file($file)
+            .use_last_modified(true)
+            .prefer_utf8(true)
+            .disable_content_disposition()
     };
 }
 
@@ -253,16 +260,16 @@ async fn post_comment(
         })
         .await?
         .map_err(error::ErrorInternalServerError);
-        
-        let referer = req
-        .headers()
-        .get(header::REFERER)
-        .and_then(|h| h.to_str().ok())
-        .unwrap_or("/");
 
-    Ok(HttpResponse::SeeOther()
-        .append_header((header::LOCATION, referer))
-        .finish())
+        let referer = req
+            .headers()
+            .get(header::REFERER)
+            .and_then(|h| h.to_str().ok())
+            .unwrap_or("/");
+
+        Ok(HttpResponse::SeeOther()
+            .append_header((header::LOCATION, referer))
+            .finish())
     } else {
         Ok(redirect!("/"))
     }
@@ -287,10 +294,7 @@ async fn fetch_all_videos(
 }
 
 #[get("/get_my_videos")]
-async fn get_my_videos(
-    pool: web::Data<Pool>,
-    session: Session,
-) -> Result<impl Responder, Error> {
+async fn get_my_videos(pool: web::Data<Pool>, session: Session) -> Result<impl Responder, Error> {
     if let Ok(Some(user_id)) = session.get::<i32>("user_id") {
         let conn = get_db_conn(&pool).await?;
 
@@ -307,7 +311,7 @@ async fn get_my_videos(
 async fn get_videos_by_userid(
     pool: web::Data<Pool>,
     session: Session,
-    user_id: web::Path<i32>
+    user_id: web::Path<i32>,
 ) -> Result<impl Responder, Error> {
     if let Ok(Some(_user_id)) = session.get::<i32>("user_id") {
         let conn = get_db_conn(&pool).await?;
@@ -325,7 +329,7 @@ async fn get_videos_by_userid(
 async fn get_private_videos_by_userid(
     pool: web::Data<Pool>,
     session: Session,
-    user_id: web::Path<i32>
+    user_id: web::Path<i32>,
 ) -> Result<impl Responder, Error> {
     if let Ok(Some(_user_id)) = session.get::<i32>("user_id") {
         let conn = get_db_conn(&pool).await?;
@@ -343,7 +347,7 @@ async fn get_private_videos_by_userid(
 async fn get_comments(
     pool: web::Data<Pool>,
     session: Session,
-    video_id: web::Path<i32>
+    video_id: web::Path<i32>,
 ) -> Result<impl Responder, Error> {
     if let Ok(Some(_user_id)) = session.get::<i32>("user_id") {
         let conn = get_db_conn(&pool).await?;
@@ -427,14 +431,17 @@ async fn get_my_profile(session: Session, pool: web::Data<Pool>) -> Result<impl 
             .await?
             .map_err(error::ErrorInternalServerError)?;
         Ok(HttpResponse::Ok().json(user_info))
+    } else {
+        Ok(redirect!("/"))
     }
-        else {
-            Ok(redirect!("/"))
-        }
 }
 
 #[post("/update_about")]
-async fn update_about(session: Session, pool: web::Data<Pool>, aboutform:web::Form<UpdateAboutForm>) -> Result<impl Responder, Error> {
+async fn update_about(
+    session: Session,
+    pool: web::Data<Pool>,
+    aboutform: web::Form<UpdateAboutForm>,
+) -> Result<impl Responder, Error> {
     if let Ok(Some(user_id)) = session.get::<i32>("user_id") {
         let about = aboutform.into_inner().about;
         let conn = get_db_conn(&pool).await?;
@@ -442,17 +449,18 @@ async fn update_about(session: Session, pool: web::Data<Pool>, aboutform:web::Fo
             .await?
             .map_err(error::ErrorInternalServerError)?;
         Ok(redirect!("app/myprofile"))
+    } else {
+        Ok(redirect!("/"))
     }
-        else {
-            Ok(redirect!("/"))
-        }
 }
 
 fn session_middleware() -> SessionMiddleware<CookieSessionStore> {
     SessionMiddleware::builder(CookieSessionStore::default(), Key::from(&[0; 64]))
         .cookie_name(String::from("session"))
         .cookie_secure(false)
-        .session_lifecycle(PersistentSession::default().session_ttl(Duration::minutes(SESSION_LIFETIME_MINUTES)))
+        .session_lifecycle(
+            PersistentSession::default().session_ttl(Duration::minutes(SESSION_LIFETIME_MINUTES)),
+        )
         .cookie_same_site(SameSite::Strict)
         .cookie_content_security(CookieContentSecurity::Private)
         .cookie_http_only(true)
@@ -461,8 +469,7 @@ fn session_middleware() -> SessionMiddleware<CookieSessionStore> {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    let db_path = std::env::var("DATABASE_PATH")
-    .unwrap_or_else(|_| "../data/parcerotv.db".into());
+    let db_path = std::env::var("DATABASE_PATH").unwrap_or_else(|_| "../data/parcerotv.db".into());
     let manager = SqliteConnectionManager::file(&db_path);
     let pool = Pool::new(manager).unwrap();
 
@@ -475,10 +482,16 @@ async fn main() -> std::io::Result<()> {
             .service(start_page)
             .service(check_credentials)
             .service(private_videos)
-            .service(Files::new("/login", "../frontend").index_file("login.html"))
-            .service(Files::new("/header", "../frontend").index_file("header.html"))
-            .service(Files::new("/footer", "../frontend").index_file("footer.html"))
-            .service(Files::new("/register", "../frontend").index_file("register.html"))
+            .service(static_page!("/login", "login.html"))
+            .service(static_page!("/header", "header.html"))
+            .service(static_page!("/footer", "footer.html"))
+            .service(static_page!("/register", "register.html"))
+            .service(static_page!("/aboutus", "about.html"))
+            .service(static_page!("/help", "help.html"))
+            .service(static_page!("/developers", "developers.html"))
+            .service(static_page!("/terms", "terms.html"))
+            .service(static_page!("/privacy", "privacy.html"))
+            .service(static_page!("/jobs", "jobs.html"))
             .service(Files::new("/js", "../frontend/js/").show_files_listing())
             .service(Files::new("/css", "../frontend/css/").show_files_listing())
             .service(Files::new("/assets", "../frontend/assets/").show_files_listing())
