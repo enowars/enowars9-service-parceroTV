@@ -1,5 +1,3 @@
-use std::io::Write;
-use std::path;
 use std::path::PathBuf;
 
 use actix_files::Files;
@@ -8,10 +6,11 @@ use actix_multipart::form::MultipartForm;
 use actix_session::config::PersistentSession;
 use actix_web::cookie::time::Duration;
 use actix_web::http::header;
+use actix_web::middleware;
 use actix_web::HttpRequest;
 use actix_web::error::ErrorInternalServerError;
 use actix_web::{
-    App, Error, HttpResponse, HttpServer, Responder, error, get, middleware, post, web,
+    App, Error, HttpResponse, HttpServer, Responder, error, get, post, web,
 };
 mod forms;
 use backend::get_path;
@@ -35,9 +34,8 @@ use forms::UpdateAboutForm;
 use forms::{CommentForm, FormInput, VideoForm};
 
 use r2d2_sqlite::SqliteConnectionManager;
-use tempfile::NamedTempFile;
 mod db;
-use actix_session::config::{BrowserSession, CookieContentSecurity};
+use actix_session::config::{CookieContentSecurity};
 use actix_session::storage::CookieSessionStore;
 use actix_session::{Session, SessionMiddleware};
 use actix_web::cookie::{Key, SameSite};
@@ -50,7 +48,7 @@ macro_rules! redirect {
     ($path:expr) => {
         HttpResponse::SeeOther()
             .append_header(("Location", $path))
-            .finish();
+            .finish()
     };
 }
 
@@ -83,7 +81,7 @@ async fn check_credentials(
         None => return Ok(HttpResponse::Unauthorized().body("User not auth!")),
     };
 
-    if (password == typed_password) {
+    if password == typed_password {
         let conn = get_db_conn(&pool).await?;
         let user_id = web::block(move || select_user_id(conn, &name_clone))
             .await?
@@ -471,6 +469,7 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .wrap(session_middleware())
+            .wrap(middleware::DefaultHeaders::new().add(("X-Content-Type-Options", "nosniff")))
             .app_data(web::Data::new(pool.clone()))
             .service(newuser)
             .service(start_page)

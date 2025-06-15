@@ -1,7 +1,6 @@
 import sqlite3
 import time
 import datetime
-import os 
 from pathlib import Path
 
 DELETE_TIMEINTEVALL = 15
@@ -29,6 +28,8 @@ while True:
 
     cutoff_time = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=DELETE_TIMEINTEVALL)
     cursor.execute("DELETE FROM users WHERE created_at < ?", (cutoff_time.strftime("%Y-%m-%d %H:%M:%S"), ))
+    cursor.execute("DELETE FROM videos WHERE created_at < ?", (cutoff_time.strftime("%Y-%m-%d %H:%M:%S"), ))
+    cursor.execute("DELETE FROM comments WHERE created_at < ?", (cutoff_time.strftime("%Y-%m-%d %H:%M:%S"), ))
 
     #Delete Files in directory
     delete_old_files("/service/data/videos/", DELETE_TIMEINTEVALL)

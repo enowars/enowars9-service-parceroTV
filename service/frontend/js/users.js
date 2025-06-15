@@ -1,7 +1,8 @@
 document.addEventListener("DOMContentLoaded", function () {
     const params = new URLSearchParams(window.location.search);
     let id;
-    const name = params.get("name");
+    let name = params.get("name");
+    const userid = params.get("id");
 
     async function fetchUser(name) {
         try {
@@ -22,7 +23,9 @@ document.addEventListener("DOMContentLoaded", function () {
         try {
             const res = await fetch("/get_user_info/" + id);
             const user = await res.json();
-
+            document.getElementById("name").innerText = user.name;
+            document.getElementById("about").innerText = user.about;
+            id = user.id;
             return user.name;
         }
         catch {
@@ -30,6 +33,10 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
     async function init() {
+        if (name == null) {
+            name = await fetchUserName(userid)
+            console.log(name);
+        }
         await fetchUser(name);
         if (!id) {
             console.error("User ID is missing. Aborting.");
