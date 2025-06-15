@@ -53,8 +53,8 @@ async def signup(client: AsyncClient, username: str, password:str, logger):
     response = await client.post("/newuser", data=signup_data)
     status_code = response.status_code
     logger.info(f"Received status code {status_code} for signup process")
-    if status_code in [200]:
-        logger.info(f"user:{username} successfully registered")
+    if status_code in [303]:
+        logger.info(f"user:{username} successfully registered with content to {response.text}")
     else:
         logger.error(f"Failed to sign up user, status_code: {status_code}")
         raise MumbleException(f"Failed to sign up user, status_code: {status_code}")
