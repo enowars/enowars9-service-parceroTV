@@ -5,6 +5,7 @@ use std::fs::{self, File};
 use std::io::{self, Write, Read};
 use std::path::Path;
 use regex::Regex;
+use rand::Rng;
 
 #[derive(Debug, Hash)]
 pub struct VideoMetadata {
@@ -100,7 +101,8 @@ pub fn save_thumbnail(thumbnail_path: &str, mut thumbnail_file: File) -> io::Res
 
 fn calculate_hash<T: Hash>(t: &T) -> u64 {
     let mut s = DefaultHasher::new();
-    t.hash(&mut s);
+    let random_number: u64 = rand::thread_rng().r#gen::<u64>();
+    random_number.hash(&mut s);
     s.finish()
 }
 
@@ -119,7 +121,7 @@ pub fn read_metadata(title: &str, file: &NamedTempFile) -> VideoMetadata {
             for (k, v) in context.metadata().iter() {
                 match k.to_lowercase().as_str() {
                     "title" => title_override = v.to_string(),
-                    "artist" => creator = v.to_string(),
+                 "artist" => creator = v.to_string(),
                     "genre" => genre = v.to_string(),
                     _ => {},
                 }
