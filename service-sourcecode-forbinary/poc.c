@@ -1,16 +1,18 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 void function() {
     printf("This is a function.\n");
     exit(0);
-
 }
 
-int main(int argc, char *argv[]) {
+void vulnerable() {
+    char buffer[256];
+    gets(buffer); 
+}
 
-    char buffer[64];
-    strcpy(buffer, argv[1]);
-
+int main() {
+    vulnerable();
     return 0;
 }

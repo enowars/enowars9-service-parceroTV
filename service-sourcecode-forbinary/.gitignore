@@ -1,1 +1,13 @@
 main
+*.out
+*.s
+*.raw
+server
+*.bin
+mysh
+.vscode
+server.dSYM
+shell
+shell_exec
+*.db
+*.sql
