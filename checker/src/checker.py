@@ -38,6 +38,7 @@ Checker config
 """
 
 SERVICE_PORT = 7777
+CLI_PORT = 7778
 checker = Enochecker("parcerotv", SERVICE_PORT)
 app = lambda: checker.app
 
