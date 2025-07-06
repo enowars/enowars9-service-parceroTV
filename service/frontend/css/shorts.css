@@ -1,0 +1,102 @@
+body,
+html {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+}
+
+#body {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+#shorts-container {
+    flex: 1;
+    overflow-y: scroll;
+    scroll-snap-type: y mandatory;
+    scrollbar-width: none;
+}
+
+#shorts-container::-webkit-scrollbar {
+    display: none;
+}
+
+.short {
+    scroll-snap-align: start;
+    height: 100%;
+    width: 100%;
+    position: relative;
+    background: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.short video {
+    height: 50%;
+    width: auto;
+    object-fit: cover;
+}
+
+.panel {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 600px;
+    max-width: 90vw;
+    background-color: #fff;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    z-index: 1000;
+    padding: 2em;
+    font-family: "Roboto", sans-serif;
+}
+
+.panel input[type="text"],
+.panel textarea,
+.panel input[type="file"] {
+    width: 100%;
+    padding: 0.6em;
+    margin-top: 0.25em;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1em;
+    background-color: #f9f9f9;
+    box-sizing: border-box;
+}
+
+.panel input[type="text"]:focus,
+.panel textarea:focus {
+    outline: none;
+    border-color: #cc0000;
+    background-color: #fff;
+}
+
+.panel button {
+    margin-top: 1em;
+    padding: 0.6em 1.2em;
+    font-size: 1em;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.panel button[type="submit"] {
+    background-color: #cc0000;
+    color: white;
+    margin-right: 0.5em;
+}
+
+.panel button[type="button"] {
+    background-color: #e0e0e0;
+    color: #333;
+}
+
+
+.hidden{
+    display: none;
+}

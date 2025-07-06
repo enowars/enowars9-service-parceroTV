@@ -35,4 +35,12 @@ pub struct VideoForm {
     pub location: Text<String>,
 }
 
+#[derive(Debug, MultipartForm)]
+pub struct ShortsForm{
+    pub name: Text<String>,
+    pub description: Text<String>,
+    pub file: TempFile,
+    pub captions: Text<String>,
+}
+
 

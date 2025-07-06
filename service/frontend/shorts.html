@@ -2,20 +2,73 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Shorts</title>
     <link rel="stylesheet" href="/css/videos.css" />
     <link rel="stylesheet" href="/css/navigation.css" />
+    <link rel="stylesheet" href="/css/shorts.css" />
     <base href="/" />
     <script src="/js/shorts.js"></script>
+
 </head>
 
 <body>
     <div id="body" class="body">
-
         <div id="header" class="header"></div>
-        <div id="footer" class="footer"></div>
+
+        <div id="panel" class="panel hidden">
+            <form id="shortUploadForm" action="/app/create_short" method="post" enctype="multipart/form-data">
+                <label>
+                    Name:<br />
+                    <input type="text" name="name" required />
+                </label>
+                <br /><br />
+
+                <label>
+                    Description:<br />
+                    <input type="text" name="description" />
+                </label>
+                <br /><br />
+
+                <label>
+                    Subtitles<br />
+                    <textarea name="caption" rows="4" cols="30"></textarea>
+                </label>
+                <br /><br />
+                <label>
+                    Translate to spanish:
+                    <input type="checkbox" required/>
+                </label>
+                <br /><br />
+                <label>
+                    Video File:<br />
+                    <input type="file" name="file" accept="video/*" required />
+                </label>
+                <br /><br />
+
+                <button type="submit">Upload</button>
+                <button type="button" onclick="document.getElementById('panel').classList.add('hidden')">Close</button>
+            </form>
+
+
+        </div>
+        <div class="playlist-actions" style="padding: 1em;">
+            <button id="uploadShortBtn" class="create-playlist-button">Upload Parcero-Short</button>
+        </div>
+
+        <div id="shorts-container">
+            <div class="short">
+                <video src="/videos/adsss12121277349792145286.mp4" autoplay muted loop>
+                    <track src="/vtt/example.vtt" kind="captions" srclang="en" default>
+                </video>
+            </div>
+
+            <div class="short">
+                <video src="/videos/asd16015246982259896647.mp4" autoplay muted loop></video>
+            </div>
+
+        </div>
     </div>
 </body>
 
