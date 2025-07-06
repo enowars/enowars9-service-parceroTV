@@ -15,19 +15,27 @@ use backend::get_path;
 use backend::get_thumbnail_path;
 use backend::save_thumbnail;
 use backend::save_video;
-use db::create_comment;
-use db::get_all_videos;
-use db::is_video_private;
-use db::select_comments_by_video_id;
-use db::select_my_videos;
-use db::select_private_videos_by_userid;
-use db::select_user_id;
-use db::select_user_info;
-use db::select_user_info_with_name;
-use db::select_video_by_path;
-use db::select_videos_by_userid;
-use db::update_about_user;
-use db::user_has_permission;
+
+use db::{
+    create_comment,
+    get_all_videos,
+    is_video_private,
+    select_comments_by_video_id,
+    select_my_videos,
+    select_private_videos_by_userid,
+    select_user_id,
+    select_user_info,
+    select_user_info_with_name,
+    select_video_by_path,
+    select_videos_by_userid,
+    update_about_user,
+    user_has_permission,
+    update_dislike_db,
+    update_like_db,
+    increase_view_count_db
+};
+
+
 use forms::UpdateAboutForm;
 use forms::{CommentForm, FormInput, VideoForm};
 
@@ -38,6 +46,8 @@ use actix_session::storage::CookieSessionStore;
 use actix_session::{Session, SessionMiddleware};
 use actix_web::cookie::{Key, SameSite};
 use db::{Pool, create_user, get_db_conn, insert_video, select_password};
+
+use crate::db::get_like_status_db;
 
 const SESSION_LIFETIME_MINUTES: i64 = 15;
 
@@ -272,6 +282,91 @@ async fn post_comment(
             .finish())
     } else {
         Ok(redirect!("/"))
+    }
+}
+
+#[get("/get_like_status/{video_id}")]
+async fn get_like_status(session: Session,
+    pool: web::Data<Pool>,
+    path: web::Path<i32>,
+) -> Result<impl Responder, Error> {
+    if let Ok(Some(user_id)) = session.get::<i32>("user_id"){
+    let conn = get_db_conn(&pool).await?;
+        let video_id = path.into_inner();
+        let like_status =
+            web::block(move || get_like_status_db(&conn, &user_id, &video_id))
+                .await?
+                .map_err(ErrorInternalServerError)?;
+
+            Ok(HttpResponse::Ok().json(like_status))
+            }
+    else {
+        Ok(redirect!("/"))
+    }
+}
+
+#[post("/update_like/{video_id}")]
+async fn update_like(
+    session: Session,
+    pool: web::Data<Pool>,
+    path: web::Path<i32>,
+) -> Result<impl Responder, Error> {
+    if let Ok(Some(user_id)) = session.get::<i32>("user_id") {
+        let conn = get_db_conn(&pool).await?;
+        let video_id = path.into_inner();
+        let has_updated =
+            web::block(move || update_like_db(&conn, &user_id, &video_id))
+                .await?
+                .map_err(ErrorInternalServerError)?;
+      if has_updated {
+          Ok(HttpResponse::Ok().body("Like updated successfully"))
+      }
+        else {
+            Ok(HttpResponse::BadRequest().body("Failed to update like"))
+        }
+    } else {
+        Ok(redirect!("/"))
+    }
+}
+
+#[post("/update_dislike/{video_id}")]
+async fn update_dislike(
+    session: Session,
+    pool: web::Data<Pool>,
+    path: web::Path<i32>,
+) -> Result<impl Responder, Error> {
+    if let Ok(Some(user_id)) = session.get::<i32>("user_id") {
+        let conn = get_db_conn(&pool).await?;
+        let video_id = path.into_inner();
+        let has_updated =
+            web::block(move || update_dislike_db(&conn, &user_id, &video_id))
+                .await?
+                .map_err(ErrorInternalServerError)?;
+        if has_updated {
+            Ok(HttpResponse::Ok().body("Dislike updated successfully"))
+        } else {
+            Ok(HttpResponse::BadRequest().body("Failed to update dislike"))
+        }
+    } else {
+        Ok(redirect!("/"))
+    }
+}
+
+#[post("/increase_view_count/{video_id}")]
+async fn increase_view_count(
+    session: Session,
+    pool: web::Data<Pool>,
+    path: web::Path<i32>,
+) -> Result<impl Responder, Error> {
+    if let Ok(Some(user_id)) = session.get::<i32>("user_id") {
+        let conn = get_db_conn(&pool).await?;
+        let video_id = path.into_inner();
+        let _ = web::block(move || increase_view_count_db(&conn, &video_id))
+            .await?
+            .map_err(ErrorInternalServerError)?;
+        Ok(HttpResponse::Ok().body("View count increased successfully"))
+    } else {
+        Ok(HttpResponse::BadRequest().body("Failed to increase view count"))
     }
 }
 
@@ -519,6 +614,10 @@ async fn main() -> std::io::Result<()> {
             .service(post_comment)
             .service(get_comments)
             .service(get_my_videos)
+            .service(get_like_status)
+            .service(update_like)
+            .service(update_dislike)
+            .service(increase_view_count)
     })
     .bind(("0.0.0.0", 8000))?
     .run()

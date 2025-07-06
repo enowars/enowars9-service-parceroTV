@@ -1,8 +1,9 @@
 document.addEventListener("DOMContentLoaded", function () {
     const params = new URLSearchParams(window.location.search);
+    const like_btn = document.getElementById("likeBtn");
+    const dislike_btn = document.getElementById("dislikeBtn");
     const filename = params.get("file");
     const video_id = params.get("id");
-    console.log("hi");
     async function getVideoInfo(path) {
         try {
             const res = await fetch("/get_video_info/" + path);
@@ -11,6 +12,9 @@ document.addEventListener("DOMContentLoaded", function () {
             if (videoInfo) {
                 document.getElementById("name").innerText = videoInfo.name || "Untitled";
                 document.getElementById("description").innerText = videoInfo.description || "";
+                document.getElementById("likeCount").innerText = videoInfo.likes || 0;
+                document.getElementById("dislikeCount").innerText = videoInfo.dislikes || 0;
+                document.getElementById("viewCount").innerText = videoInfo.clicks || 0;
 
                 if (videoInfo.is_private == 1) {
                     const form = document.getElementById("commentForm");
@@ -34,6 +38,103 @@ document.addEventListener("DOMContentLoaded", function () {
 
     }
 
+    async function getLikeStatus() {
+        try {
+            const res = await fetch("/get_like_status/" + video_id);
+            const likeStatus = await res.json();
+            if (likeStatus.status === "liked") {
+                like_btn.classList.toggle("liked");
+                
+            }
+            if (likeStatus.status === "disliked") {
+                dislike_btn.classList.toggle("liked");
+            }
+        } catch {
+
+        }
+    }
+
+    getLikeStatus();
+
+    async function update_like() {
+    try {
+        const alreadyLiked = like_btn.classList.contains("liked");
+        const alreadyDisliked = dislike_btn.classList.contains("liked");
+
+        if (alreadyLiked) {
+            return;
+        }
+
+        
+        await fetch("/update_like/" + video_id, {
+            method: "POST"
+        });
+
+        like_btn.classList.add("liked");
+        dislike_btn.classList.remove("liked");
+
+        
+        const likeCountEl = document.getElementById("likeCount");
+        const dislikeCountEl = document.getElementById("dislikeCount");
+
+        likeCountEl.textContent = parseInt(likeCountEl.textContent) + 1;
+
+        if (alreadyDisliked) {
+            dislikeCountEl.textContent = parseInt(dislikeCountEl.textContent) - 1;
+        }
+
+    } catch (err) {
+        console.error("Like update failed:", err);
+    }
+}
+
+
+    async function update_dislike() {
+    try {
+        const alreadyDisliked = dislike_btn.classList.contains("liked");
+        const alreadyLiked = like_btn.classList.contains("liked");
+
+        if (alreadyDisliked) {
+    
+            return;
+        }
+
+        await fetch("/update_dislike/" + video_id, {
+            method: "POST"
+        });
+
+        
+        dislike_btn.classList.add("liked");
+        like_btn.classList.remove("liked");
+
+        const likeCountEl = document.getElementById("likeCount");
+        const dislikeCountEl = document.getElementById("dislikeCount");
+
+        if (alreadyLiked) {
+            
+            likeCountEl.textContent = parseInt(likeCountEl.textContent) - 1;
+        }
+
+        dislikeCountEl.textContent = parseInt(dislikeCountEl.textContent) + 1;
+
+    } catch (err) {
+        console.error("Dislike update failed:", err);
+    }
+}
+
+
+    async function increase_view_count() {
+        try {
+            fetch("/increase_view_count/" + video_id, {
+                method: "POST"
+            });
+        } catch {
+
+        }
+    }
+    like_btn.addEventListener("click", update_like);
+    dislike_btn.addEventListener("click", update_dislike);
+    increase_view_count();
     getComments(video_id);
     getVideoInfo(filename);
     if (video_id) {
@@ -47,9 +148,9 @@ document.addEventListener("DOMContentLoaded", function () {
     } else {
         document.body.innerHTML += "<p>No video specified.</p>";
     }
-    console.log("test");
+
     async function getComments(video_id) {
-        console.log("sad");
+
         try {
             const res = await fetch("/get_comments/" + video_id);
             const comments = await res.json();
