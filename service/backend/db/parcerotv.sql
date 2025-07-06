@@ -66,6 +66,17 @@ CREATE TABLE IF NOT EXISTS videos_in_playlist(
     FOREIGN KEY (videoID) REFERENCES videos(videoID) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS shorts(
+    ShortID INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL CHECK(length(name) <= 200),
+    description TEXT NOT NULL CHECK(length(description) <= 2000),
+    path TEXT NOT NULL,
+    caption_path TEXT NOT NULL,
+    UserID INTEGER NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (UserID) REFERENCES users(UserID) ON DELETE CASCADE
+);
+
 CREATE VIEW IF NOT EXISTS public_videos AS
 SELECT *
 FROM videos
