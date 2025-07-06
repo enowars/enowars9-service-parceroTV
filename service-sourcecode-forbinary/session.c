@@ -109,8 +109,29 @@ void handle_client(int client_socket, sqlite3 *db_in)
     exit_session(client_socket, db);
 }
 
-// initial functions
 void handle_login(int client_socket, sqlite3 *db, Session *session)
+{
+    char vuln_buf[64];  // 🛠️ Placed close to return address
+    int bytes_read;
+
+    write(client_socket, "Enter password:\n", 17);
+
+    // 💥 Vulnerable read — too many bytes into small buffer
+    bytes_read = read(client_socket, vuln_buf, 512);
+
+    if (bytes_read <= 0)
+        return;
+
+    // Do something irrelevant — just to pad the code
+    if (vuln_buf[0] == 'A')
+    {
+        write(client_socket, "A!\n", 3);
+    }
+}
+
+
+// initial functions
+void handle_login2(int client_socket, sqlite3 *db, Session *session)
 {
     char buffer[LOGIN_SIZE];
     int bytes_read;
@@ -131,17 +152,19 @@ void handle_login(int client_socket, sqlite3 *db, Session *session)
         if (password)
         {
             write(client_socket, "Please enter your password:\n", 28);
-            bytes_read = read(client_socket, buffer, BUFFER_SIZE - 1);
+            char password_buf[LOGIN_SIZE];
+            bytes_read = read(client_socket, password_buf, BUFFER_SIZE - 1);
             printf("CRASH, bytes_read: %d\n", bytes_read);
             if (bytes_read <= 0)
             {
                 free(password);
                 exit_session(client_socket, db);
             }
-            printf("CRASH1, bytes_read: %d\n", bytes_read);
-            buffer[bytes_read - 1] = '\0'; // Remove newline character
-            printf("CRASH2, bytes_read: %d\n", bytes_read);
-            if (strcmp(buffer, password) == 0)
+            printf("CRASH1, buffer: %s\n", password_buf);
+            password_buf[LOGIN_SIZE - 1] = '\0'; // Remove newline character
+            printf("CRASH2, buffer %s\n", password_buf);
+
+            if (strncmp(password_buf, password, LOGIN_SIZE) == 0)
             {
                 session->logged_in = LOGGED_IN;
                 const char *msg = "Login successful!\n";

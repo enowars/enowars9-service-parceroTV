@@ -61,8 +61,8 @@ int main() {
             continue;
         }
 
-        pid_t pid = fork();
-        if (IS_CHILD(pid)) {
+        //pid_t pid = fork();
+        if (1) {
             close(server_fd); 
 
             sqlite3 *db;
@@ -74,7 +74,7 @@ int main() {
             }
 
             handle_client(new_socket, db);
-        } else if (IS_PARENT(pid)) {
+        } else if (0) {
             close(new_socket); 
         } else {
             perror("fork failed");
