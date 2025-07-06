@@ -169,6 +169,16 @@ async fn users(session: Session) -> Result<impl Responder, Error> {
     serve_file_or_reject(session, "../frontend/users.html").await
 }
 
+#[get("/playlist")]
+async fn playlist(session: Session) -> Result<impl Responder, Error> {
+    serve_file_or_reject(session, "../frontend/playlist.html").await
+}
+
+#[get("/shorts")]
+async fn shorts(session: Session) -> Result<impl Responder, Error> {
+    serve_file_or_reject(session, "../frontend/shorts.html").await
+}
+
 #[get("/no_permission")]
 async fn no_permission(session: Session) -> Result<impl Responder, Error> {
     serve_file_or_reject(session, "../frontend/no_permission.html").await
@@ -599,7 +609,9 @@ async fn main() -> std::io::Result<()> {
                     .service(videos)
                     .service(upload_video_page)
                     .service(create_video)
-                    .service(users),
+                    .service(users)
+                    .service(playlist)
+                    .service(shorts),
             )
             .service(fetch_all_videos)
             .service(no_permission)
