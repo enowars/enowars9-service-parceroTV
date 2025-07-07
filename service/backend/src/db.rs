@@ -258,7 +258,8 @@ pub fn insert_video(
     Ok(())
 }
 
-pub fn insert_short(conn: Connection,
+pub fn insert_short(
+    conn: Connection,
     name: &str,
     description: &str,
     path: &str,
@@ -267,7 +268,7 @@ pub fn insert_short(conn: Connection,
     user_id: &u32,
 ) -> Result<()> {
     conn.execute(
-        "INSERT INTO shorts (name, description, path, caption_path, original_captions UserID) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        "INSERT INTO shorts (name, description, path, caption_path, original_captions, UserID) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
         (name, description, path, caption_path, original_captions, user_id)
     )?;
 
@@ -297,12 +298,20 @@ pub fn get_like_status_db(conn: &Connection, user_id: &i32, video_id: &i32) -> R
         params![user_id, video_id],
         |row| row.get(0),
     );
-    
+
     match result {
-        Ok(1) => Ok(LikeStatus { status: "liked".to_string() }),
-        Ok(0) => Ok(LikeStatus { status: "disliked".to_string() }),
-        Ok(_) => Ok(LikeStatus { status: "none".to_string() }),
-        Err(_) => Ok(LikeStatus { status: "none".to_string() })
+        Ok(1) => Ok(LikeStatus {
+            status: "liked".to_string(),
+        }),
+        Ok(0) => Ok(LikeStatus {
+            status: "disliked".to_string(),
+        }),
+        Ok(_) => Ok(LikeStatus {
+            status: "none".to_string(),
+        }),
+        Err(_) => Ok(LikeStatus {
+            status: "none".to_string(),
+        }),
     }
 }
 
@@ -312,9 +321,9 @@ pub fn update_like_db(conn: &Connection, user_id: &i32, video_id: &i32) -> Resul
         params![user_id, video_id],
         |row| row.get(0),
     );
-    
+
     match result {
-        Ok(1) => Ok(false), // Already liked
+        Ok(1) => Ok(false),
         Ok(0) => {
             conn.execute(
                 "UPDATE has_liked SET like_status = 1 WHERE UserID = ?1 AND VideoID = ?2",
@@ -329,9 +338,8 @@ pub fn update_like_db(conn: &Connection, user_id: &i32, video_id: &i32) -> Resul
                 params![video_id],
             )?;
             Ok(true)
-        },
-        Ok(_) => Ok(false), // If like_status is neither 0 nor 1, we assume it's an invalid state
-
+        }
+        Ok(_) => Ok(false),
         Err(rusqlite::Error::QueryReturnedNoRows) => {
             conn.execute(
                 "INSERT INTO has_liked (UserID, VideoID, like_status) VALUES (?1, ?2, 1)",
@@ -343,9 +351,8 @@ pub fn update_like_db(conn: &Connection, user_id: &i32, video_id: &i32) -> Resul
             )?;
             Ok(true)
         }
-        Err(e) => Err(e), // propagate any other DB errors
+        Err(e) => Err(e),
     }
-
 }
 
 pub fn update_dislike_db(conn: &Connection, user_id: &i32, video_id: &i32) -> Result<bool> {
@@ -371,8 +378,8 @@ pub fn update_dislike_db(conn: &Connection, user_id: &i32, video_id: &i32) -> Re
                 params![video_id],
             )?;
             Ok(true)
-        },
-        Ok(_) => Ok(false), // Invalid value, treat as no action
+        }
+        Ok(_) => Ok(false),
 
         Err(rusqlite::Error::QueryReturnedNoRows) => {
             conn.execute(
@@ -384,11 +391,10 @@ pub fn update_dislike_db(conn: &Connection, user_id: &i32, video_id: &i32) -> Re
                 params![video_id],
             )?;
             Ok(true)
-        },
+        }
         Err(e) => Err(e),
     }
 }
-
 
 pub fn increase_view_count_db(conn: &Connection, video_id: &i32) -> Result<()> {
     conn.execute(
@@ -440,7 +446,6 @@ pub struct CommentWithUserInfo {
 }
 
 #[derive(Debug, serde::Serialize)]
-pub struct LikeStatus{
-    status: String
+pub struct LikeStatus {
+    status: String,
 }
-

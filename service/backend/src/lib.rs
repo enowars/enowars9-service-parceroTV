@@ -1,3 +1,5 @@
+
+
 extern crate ffmpeg_next as ffmpeg;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use tempfile::NamedTempFile;
@@ -15,7 +17,7 @@ pub struct VideoMetadata {
 
 
 
-fn sanitize_title(title: &str, is_video: bool) -> &str {
+pub fn sanitize_title(title: &str, is_video: bool) -> &str {
     let re = Regex::new(r"^[a-zA-Z0-9_-]+$").unwrap();
     if re.is_match(title) {
         title

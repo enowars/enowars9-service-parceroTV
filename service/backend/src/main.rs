@@ -13,29 +13,19 @@ use actix_web::{App, Error, HttpResponse, HttpServer, Responder, error, get, pos
 mod forms;
 use backend::get_path;
 use backend::get_thumbnail_path;
+use backend::sanitize_title;
 use backend::save_thumbnail;
 use backend::save_video;
 
 use db::{
-    create_comment,
-    get_all_videos,
-    is_video_private,
-    select_comments_by_video_id,
-    select_my_videos,
-    select_private_videos_by_userid,
-    select_user_id,
-    select_user_info,
-    select_user_info_with_name,
-    select_video_by_path,
-    select_videos_by_userid,
-    update_about_user,
-    user_has_permission,
-    update_dislike_db,
-    update_like_db,
-    increase_view_count_db
+    create_comment, get_all_videos, increase_view_count_db, is_video_private,
+    select_comments_by_video_id, select_my_videos, select_private_videos_by_userid, select_user_id,
+    select_user_info, select_user_info_with_name, select_video_by_path, select_videos_by_userid,
+    update_about_user, update_dislike_db, update_like_db, user_has_permission,
 };
 
-use shorts_lib::{save_short};
+mod shorts_lib;
+use shorts_lib::save_short;
 
 use forms::UpdateAboutForm;
 use forms::{CommentForm, FormInput, VideoForm};
@@ -52,6 +42,7 @@ use rusqlite::types::Null;
 use crate::db::get_like_status_db;
 use crate::db::insert_short;
 use crate::forms::ShortsForm;
+use crate::shorts_lib::save_caption;
 
 const SESSION_LIFETIME_MINUTES: i64 = 15;
 
@@ -261,38 +252,41 @@ async fn create_video(
 
 #[post("/create_short")]
 async fn create_short(
-     pool: web::Data<Pool>,
+    pool: web::Data<Pool>,
     session: Session,
     MultipartForm(short_form): MultipartForm<ShortsForm>,
 ) -> Result<impl Responder, Error> {
     if let Ok(Some(user_id)) = session.get::<u32>("user_id") {
-        let short_to_save = short_form.file.file.reopen();
+        let short_to_save = short_form.file.file.reopen()?;
         let captions = if short_form.captions.as_str().is_empty() {
             None
         } else {
             Some(short_form.captions.clone())
         };
-        let captions_ref = captions.as_deref();
-        let short_path = save_short(&short_form.name, short_to_save);
-        let caption_path = save_caption();
+        let short_path = save_short(short_to_save)?;
+
+        let caption_path = match captions.as_ref() {
+                    Some(captions) => Some(save_caption(captions, *short_form.translate_to_spanish, *short_form.duration)?),
+                    None => None,
+                };
 
         let conn = get_db_conn(&pool).await?;
         let _ = web::block(move || {
+            let captions_ref = captions.as_deref();
             insert_short(
                 conn,
                 &short_form.name,
                 &short_form.description,
                 &short_path,
-                &caption_path,
+                caption_path.as_deref(),
                 captions_ref,
                 &user_id,
             )
         })
         .await?
         .map_err(error::ErrorInternalServerError);
-        Ok(redirect!("/shorts"))
-    }
-    else {
+        Ok(redirect!("/app/shorts"))
+    } else {
         Ok(redirect!("/"))
     }
 }
@@ -338,21 +332,20 @@ async fn post_comment(
 }
 
 #[get("/get_like_status/{video_id}")]
-async fn get_like_status(session: Session,
+async fn get_like_status(
+    session: Session,
     pool: web::Data<Pool>,
     path: web::Path<i32>,
 ) -> Result<impl Responder, Error> {
-    if let Ok(Some(user_id)) = session.get::<i32>("user_id"){
-    let conn = get_db_conn(&pool).await?;
+    if let Ok(Some(user_id)) = session.get::<i32>("user_id") {
+        let conn = get_db_conn(&pool).await?;
         let video_id = path.into_inner();
-        let like_status =
-            web::block(move || get_like_status_db(&conn, &user_id, &video_id))
-                .await?
-                .map_err(ErrorInternalServerError)?;
+        let like_status = web::block(move || get_like_status_db(&conn, &user_id, &video_id))
+            .await?
+            .map_err(ErrorInternalServerError)?;
 
-            Ok(HttpResponse::Ok().json(like_status))
-            }
-    else {
+        Ok(HttpResponse::Ok().json(like_status))
+    } else {
         Ok(redirect!("/"))
     }
 }
@@ -366,14 +359,12 @@ async fn update_like(
     if let Ok(Some(user_id)) = session.get::<i32>("user_id") {
         let conn = get_db_conn(&pool).await?;
         let video_id = path.into_inner();
-        let has_updated =
-            web::block(move || update_like_db(&conn, &user_id, &video_id))
-                .await?
-                .map_err(ErrorInternalServerError)?;
-      if has_updated {
-          Ok(HttpResponse::Ok().body("Like updated successfully"))
-      }
-        else {
+        let has_updated = web::block(move || update_like_db(&conn, &user_id, &video_id))
+            .await?
+            .map_err(ErrorInternalServerError)?;
+        if has_updated {
+            Ok(HttpResponse::Ok().body("Like updated successfully"))
+        } else {
             Ok(HttpResponse::BadRequest().body("Failed to update like"))
         }
     } else {
@@ -390,10 +381,9 @@ async fn update_dislike(
     if let Ok(Some(user_id)) = session.get::<i32>("user_id") {
         let conn = get_db_conn(&pool).await?;
         let video_id = path.into_inner();
-        let has_updated =
-            web::block(move || update_dislike_db(&conn, &user_id, &video_id))
-                .await?
-                .map_err(ErrorInternalServerError)?;
+        let has_updated = web::block(move || update_dislike_db(&conn, &user_id, &video_id))
+            .await?
+            .map_err(ErrorInternalServerError)?;
         if has_updated {
             Ok(HttpResponse::Ok().body("Dislike updated successfully"))
         } else {
@@ -652,6 +642,7 @@ async fn main() -> std::io::Result<()> {
                     .service(videos)
                     .service(upload_video_page)
                     .service(create_video)
+                    .service(create_short)
                     .service(users)
                     .service(playlist)
                     .service(shorts),

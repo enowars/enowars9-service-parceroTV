@@ -33,12 +33,13 @@
 
                 <label>
                     Subtitles<br />
-                    <textarea name="caption" rows="4" cols="30"></textarea>
+                    <textarea name="captions" rows="4" cols="30"></textarea>
                 </label>
                 <br /><br />
                 <label>
-                    Translate to spanish:
-                    <input type="checkbox" required/>
+                    Translate to Spanish:
+                    <input type="hidden" name="translate_to_spanish" value="false">
+                    <input type="checkbox" name="translate_to_spanish" value="true">
                 </label>
                 <br /><br />
                 <label>
@@ -46,7 +47,7 @@
                     <input type="file" name="file" accept="video/*" required />
                 </label>
                 <br /><br />
-
+                <input type="number" name="duration" value="50" hidden />
                 <button type="submit">Upload</button>
                 <button type="button" onclick="document.getElementById('panel').classList.add('hidden')">Close</button>
             </form>
