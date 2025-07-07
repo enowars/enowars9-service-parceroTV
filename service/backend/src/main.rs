@@ -264,7 +264,6 @@ async fn create_short(
             Some(short_form.captions.clone())
         };
         let short_path = save_short(short_to_save)?;
-
         let caption_path = match captions.as_ref() {
                     Some(captions) => Some(save_caption(captions, *short_form.translate_to_spanish, *short_form.duration)?),
                     None => None,

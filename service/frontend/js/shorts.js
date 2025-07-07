@@ -34,7 +34,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const res = await fetch("/get_shorts");
         allShorts = await res.json();
         if (allShorts.length === 0) return;
-        appendShorts(3); // Initial load
+        appendShorts(3); 
     }
 
     function appendShorts(count) {
@@ -56,8 +56,8 @@ document.addEventListener("DOMContentLoaded", function () {
             video.autoplay = true;
             video.muted = true;
             video.loop = true;
-            video.setAttribute("playsinline", ""); // good for mobile
-            video.setAttribute("controls", "");    // optional for caption toggle
+            video.setAttribute("playsinline", ""); 
+            video.setAttribute("controls", "");  
 
             if (short.caption_path) {
                 const track = document.createElement("track");
