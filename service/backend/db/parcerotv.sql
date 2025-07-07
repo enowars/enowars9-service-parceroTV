@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS videos_in_playlist(
 
 CREATE TABLE IF NOT EXISTS shorts(
     ShortID INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL CHECK(length(name) <= 200),
+    name TEXT UNIQUE NOT NULL CHECK(length(name) <= 200),
     description TEXT NOT NULL CHECK(length(description) <= 2000),
     path TEXT NOT NULL,
     caption_path TEXT,

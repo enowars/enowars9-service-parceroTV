@@ -134,6 +134,27 @@ pub fn select_video_by_path(conn: Connection, path: &str) -> Result<VideoInfo> {
     Ok(video)
 }
 
+pub fn select_shorts(conn: Connection, user_id: &i32) -> Result<Vec<ShortInfo>> {
+    let mut stmt = conn.prepare(
+        "SELECT ShortID, name, description, path, caption_path, CASE WHEN userID = ?1 THEN original_captions ELSE NULL END, UserID FROM shorts ORDER BY created_at DESC",
+    )?;
+
+    let shorts = stmt
+        .query_map([user_id], |row| {
+            Ok(ShortInfo {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                description: row.get(2)?,
+                path: row.get(3)?,
+                caption_path: row.get(4)?,
+                original_captions: row.get(5)?,
+                user_id: row.get(6)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(shorts)
+}
+
 pub fn select_comments_by_video_id(
     conn: Connection,
     video_id: &i32,
@@ -427,6 +448,17 @@ pub struct VideoInfoPrivate {
     pub thumbnail_path: String,
     pub location: String,
     pub userId: i32,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct ShortInfo {
+    id: i32,
+    name: String,
+    description: String,
+    path: String,
+    caption_path: String,
+    original_captions: Option<String>,
+    user_id: i32,
 }
 
 #[derive(Debug, serde::Serialize)]

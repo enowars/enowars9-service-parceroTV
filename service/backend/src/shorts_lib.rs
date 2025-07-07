@@ -76,7 +76,7 @@ pub fn generate_vtt(captions: &str, translate_to_spanish: bool, duration: f64) -
             let m = (total_ms % 3600000) / 60000;
             let s = (total_ms % 60000) / 1000;
             let ms = total_ms % 1000;
-            format!("{:02}:{:02}:{:02},{:03}", h, m, s, ms)
+            format!("{:02}:{:02}:{:02}.{:03}", h, m, s, ms)
         };
 
         writeln!(buffer, "{}", i + 1).unwrap();

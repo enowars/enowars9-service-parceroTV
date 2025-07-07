@@ -21,7 +21,7 @@ use db::{
     create_comment, get_all_videos, increase_view_count_db, is_video_private,
     select_comments_by_video_id, select_my_videos, select_private_videos_by_userid, select_user_id,
     select_user_info, select_user_info_with_name, select_video_by_path, select_videos_by_userid,
-    update_about_user, update_dislike_db, update_like_db, user_has_permission,
+    update_about_user, update_dislike_db, update_like_db, user_has_permission, select_shorts
 };
 
 mod shorts_lib;
@@ -573,6 +573,39 @@ async fn get_my_profile(session: Session, pool: web::Data<Pool>) -> Result<impl 
     }
 }
 
+#[get("/get_shorts")]
+async fn get_shorts(session: Session, pool: web::Data<Pool>) -> Result<impl Responder, Error> {
+    if let Ok(Some(user_id)) = session.get::<i32>("user_id") {
+        let conn = get_db_conn(&pool).await?;
+        let shorts_info = web::block(move || select_shorts(conn, &user_id))
+            .await?
+            .map_err(error::ErrorInternalServerError)?;
+        Ok(HttpResponse::Ok().json(shorts_info))
+    } else {
+        Ok(redirect!("/"))
+    }
+}
+
+
+#[get("/shorts/{filename}")]
+async fn stream_shorts(req: HttpRequest, path: web::Path<String>, session: Session) -> Result<impl Responder, Error> {
+    if let Ok(Some(user_id)) = session.get::<i32>("user_id") {
+        let filename = path.into_inner();
+
+    if filename.contains("..") || filename.contains('/') || filename.contains('\\') {
+        return Ok(HttpResponse::BadRequest().body("Invalid filename"));
+    }
+
+    let mut file_path = PathBuf::from("../data/shorts/");
+    file_path.push(&filename);
+
+    let file = NamedFile::open(file_path)?;
+    Ok(file.use_last_modified(true).prefer_utf8(true).into_response(&req))
+    } else {
+        Ok(redirect!("/"))
+    }
+}
+
 #[post("/update_about")]
 async fn update_about(
     session: Session,
@@ -648,6 +681,8 @@ async fn main() -> std::io::Result<()> {
                     .service(shorts),
             )
             .service(fetch_all_videos)
+            .service(get_shorts)
+            .service(stream_shorts)
             .service(no_permission)
             .service(get_video_info)
             .service(logout)

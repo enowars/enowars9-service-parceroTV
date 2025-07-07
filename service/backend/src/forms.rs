@@ -25,6 +25,7 @@ pub struct VideoInfo {
     pub is_private: u32,
 }
 
+
 #[derive(Debug, MultipartForm)]
 pub struct VideoForm {
     pub name: Text<String>,
@@ -42,6 +43,8 @@ pub struct ShortsForm{
     pub file: TempFile,
     pub captions: Text<String>,
     pub translate_to_spanish: Text<bool>,
+    pub duration: Text<f64>,
 }
+
 
 
