@@ -71,7 +71,8 @@ CREATE TABLE IF NOT EXISTS shorts(
     name TEXT NOT NULL CHECK(length(name) <= 200),
     description TEXT NOT NULL CHECK(length(description) <= 2000),
     path TEXT NOT NULL,
-    caption_path TEXT NOT NULL,
+    caption_path TEXT,
+    original_captions TEXT,
     UserID INTEGER NOT NULL,
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY (UserID) REFERENCES users(UserID) ON DELETE CASCADE

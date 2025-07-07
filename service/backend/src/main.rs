@@ -35,6 +35,7 @@ use db::{
     increase_view_count_db
 };
 
+use shorts_lib::{save_short};
 
 use forms::UpdateAboutForm;
 use forms::{CommentForm, FormInput, VideoForm};
@@ -46,8 +47,11 @@ use actix_session::storage::CookieSessionStore;
 use actix_session::{Session, SessionMiddleware};
 use actix_web::cookie::{Key, SameSite};
 use db::{Pool, create_user, get_db_conn, insert_video, select_password};
+use rusqlite::types::Null;
 
 use crate::db::get_like_status_db;
+use crate::db::insert_short;
+use crate::forms::ShortsForm;
 
 const SESSION_LIFETIME_MINUTES: i64 = 15;
 
@@ -251,6 +255,44 @@ async fn create_video(
         save_video(&path_clone, file_to_save)?;
         Ok(redirect!("/app/home"))
     } else {
+        Ok(redirect!("/"))
+    }
+}
+
+#[post("/create_short")]
+async fn create_short(
+     pool: web::Data<Pool>,
+    session: Session,
+    MultipartForm(short_form): MultipartForm<ShortsForm>,
+) -> Result<impl Responder, Error> {
+    if let Ok(Some(user_id)) = session.get::<u32>("user_id") {
+        let short_to_save = short_form.file.file.reopen();
+        let captions = if short_form.captions.as_str().is_empty() {
+            None
+        } else {
+            Some(short_form.captions.clone())
+        };
+        let captions_ref = captions.as_deref();
+        let short_path = save_short(&short_form.name, short_to_save);
+        let caption_path = save_caption();
+
+        let conn = get_db_conn(&pool).await?;
+        let _ = web::block(move || {
+            insert_short(
+                conn,
+                &short_form.name,
+                &short_form.description,
+                &short_path,
+                &caption_path,
+                captions_ref,
+                &user_id,
+            )
+        })
+        .await?
+        .map_err(error::ErrorInternalServerError);
+        Ok(redirect!("/shorts"))
+    }
+    else {
         Ok(redirect!("/"))
     }
 }

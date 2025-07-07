@@ -41,6 +41,7 @@ pub struct ShortsForm{
     pub description: Text<String>,
     pub file: TempFile,
     pub captions: Text<String>,
+    pub translate_to_spanish: Text<bool>,
 }
 
 

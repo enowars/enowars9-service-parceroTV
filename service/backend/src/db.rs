@@ -258,6 +258,22 @@ pub fn insert_video(
     Ok(())
 }
 
+pub fn insert_short(conn: Connection,
+    name: &str,
+    description: &str,
+    path: &str,
+    caption_path: Option<&str>,
+    original_captions: Option<&str>,
+    user_id: &u32,
+) -> Result<()> {
+    conn.execute(
+        "INSERT INTO shorts (name, description, path, caption_path, original_captions UserID) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        (name, description, path, caption_path, original_captions, user_id)
+    )?;
+
+    Ok(())
+}
+
 pub fn create_comment(conn: Connection, comment: &str, user_id: &i32, videoid: &i32) -> Result<()> {
     conn.execute(
         "INSERT INTO comments (comment, userid, videoid) VALUES (?1, ?2, ?3)",
