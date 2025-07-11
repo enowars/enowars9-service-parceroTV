@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-
+mod spanish_dictionary;
 use actix_files::Files;
 use actix_files::NamedFile;
 use actix_multipart::form::MultipartForm;

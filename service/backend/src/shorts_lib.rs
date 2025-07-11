@@ -1,10 +1,9 @@
-use once_cell::sync::Lazy;
-use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{self, Read, Write};
 use std::path::Path;
 use uuid::Uuid;
 
+use crate::spanish_dictionary::SPANISH_WORDS;
 use rand::RngCore;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
@@ -93,82 +92,60 @@ pub fn generate_vtt(captions: &str, translate: bool, duration: f64) -> Vec<u8> {
         writeln!(buffer, "{} --> {}", format_time(start), format_time(end)).unwrap();
         writeln!(buffer, "{}", text).unwrap();
         writeln!(buffer).unwrap(); // Blank line
-        println!("{}", text);
     }
 
     buffer
 }
 
-static RAW_WORDS: &str = include_str!("../spanish_words.txt");
-
-const PER_LETTER: usize = 4096 / 26;
-
-pub static SPANISH_WORDS: Lazy<[&'static str; 4096]> = Lazy::new(|| {
-    let mut groups: HashMap<char, Vec<&str>> = HashMap::new();
-    for word in RAW_WORDS.lines().map(str::trim).filter(|l| !l.is_empty()) {
-        if let Some(ch) = word.chars().next() {
-            let lc = ch.to_ascii_lowercase();
-            if ('a'..='z').contains(&lc) {
-                groups.entry(lc).or_default().push(word);
-            }
-        }
-    }
-
-    let mut arr: [&str; 4096] = [""; 4096];
-    let mut idx = 0;
-
-    for letter in 'a'..='z' {
-        let bucket = groups
-            .get(&letter)
-            .unwrap_or_else(|| panic!("No words for letter '{}'", letter));
-        for i in 0..PER_LETTER {
-            let w = bucket[i % bucket.len()];
-            arr[idx] = w;
-            idx += 1;
-        }
-    }
-
-    while idx < 4096 {
-        arr[idx] = groups.get(&'a').unwrap()[idx % groups.get(&'a').unwrap().len()];
-        idx += 1;
-    }
-
-
-    arr
-});
 
 fn translate_to_spanish(captions: &str, duration: f64) -> String {
-    let blob = get_blob(captions.as_bytes(), duration);
+    let transform_stream = get_transform_stream(captions.as_bytes(), duration);
 
+    println!("Original length of bytes in captions: {}", captions.len());
+    println!("Length of transform_stream: {}", transform_stream.len());
     let mut bits: u32 = 0;
     let mut bits_count: u8 = 0;
     let mut words = Vec::new();
 
-    for &byte in &blob {
+    for &byte in &transform_stream {
         bits = (bits << 8) | (byte as u32);
         bits_count += 8;
+        println!(
+            "byte: {} Current bits: {:032b}, bits_count: {}",
+            byte, bits, bits_count
+        );
 
         while bits_count >= 12 {
             bits_count -= 12;
             let idx = ((bits >> bits_count) & 0xFFF) as usize;
+            println!("Index: {}", idx);
             words.push(SPANISH_WORDS[idx]);
         }
     }
 
     if bits_count > 0 {
         let idx = ((bits << (12 - bits_count)) & 0xFFF) as usize;
+        println!(" Current bits: {:032b}, bits_count: {}", bits, bits_count);
+        println!("Index: {}", idx);
         words.push(SPANISH_WORDS[idx]);
     }
 
     words.join(" ")
 }
 
-fn get_blob(blob: &[u8], duration: f64) -> Vec<u8> {
+fn get_transform_stream(words: &[u8], duration: f64) -> Vec<u8> {
     let ms = (duration * 1000.0).round() as u64;
     let ms = NonZeroU64::new(ms).unwrap_or(NonZeroU64::new(1).unwrap());
     let mut seed = [0u8; 32];
     seed[..8].copy_from_slice(&ms.get().to_le_bytes());
+    println!("Seed: {:?}", seed);
     let mut rng = ChaCha20Rng::from_seed(seed);
 
-    blob.iter().map(|&b| b ^ (rng.next_u64() as u8)).collect()
+    words.iter()
+        .map(|&b| {
+            let full = (rng.next_u64());
+            let byte = (full & 0xFF) as u8;
+            b ^ byte
+        })
+        .collect()
 }

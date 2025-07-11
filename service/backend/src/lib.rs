@@ -1,5 +1,4 @@
 
-
 extern crate ffmpeg_next as ffmpeg;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use tempfile::NamedTempFile;
