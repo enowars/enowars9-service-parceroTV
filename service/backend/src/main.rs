@@ -3,6 +3,8 @@ mod spanish_dictionary;
 use actix_files::Files;
 use actix_files::NamedFile;
 use actix_multipart::form::MultipartForm;
+use actix_multipart::form::MultipartFormConfig;
+use actix_multipart::MultipartError;
 use actix_session::config::PersistentSession;
 use actix_web::HttpRequest;
 use actix_web::cookie::time::Duration;
@@ -45,6 +47,7 @@ use crate::forms::ShortsForm;
 use crate::shorts_lib::save_caption;
 
 const SESSION_LIFETIME_MINUTES: i64 = 15;
+const TWO_MB: usize = 2 * 1024 * 1024; // 2 MB
 
 macro_rules! redirect {
     ($path:expr) => {
@@ -636,6 +639,14 @@ fn session_middleware() -> SessionMiddleware<CookieSessionStore> {
         .build()
 }
 
+fn handle_multipart_error(err: actix_multipart::MultipartError, _req: &HttpRequest) -> actix_web::Error {
+    println!("To large multipart request: {}", err);
+    let response = HttpResponse::BadRequest()
+        .force_close()
+        .finish();
+    actix_web::error::InternalError::from_response(err, response).into()
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let db_path = std::env::var("DATABASE_PATH").unwrap_or_else(|_| "../data/parcerotv.db".into());
@@ -647,6 +658,8 @@ async fn main() -> std::io::Result<()> {
             .wrap(session_middleware())
             .wrap(middleware::DefaultHeaders::new().add(("X-Content-Type-Options", "nosniff")))
             .app_data(web::Data::new(pool.clone()))
+            .app_data(web::PayloadConfig::new(TWO_MB))
+            .app_data(MultipartFormConfig::default().total_limit(TWO_MB).memory_limit(TWO_MB).error_handler(handle_multipart_error))
             .service(newuser)
             .service(start_page)
             .service(check_credentials)
@@ -661,6 +674,7 @@ async fn main() -> std::io::Result<()> {
             .service(static_page!("/terms", "terms.html"))
             .service(static_page!("/privacy", "privacy.html"))
             .service(static_page!("/jobs", "jobs.html"))
+            .service(static_page!("/uploads_error", "uploads_error.html"))
             .service(Files::new("/js", "../frontend/js/").show_files_listing())
             .service(Files::new("/css", "../frontend/css/").show_files_listing())
             .service(Files::new("/assets", "../frontend/assets/").show_files_listing())
