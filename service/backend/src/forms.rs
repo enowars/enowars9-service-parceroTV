@@ -31,7 +31,9 @@ pub struct VideoForm {
     pub name: Text<String>,
     pub description: Text<String>,
     pub is_private: Text<u32>,
+    #[multipart(limit = "2MB")]
     pub file: TempFile,
+    #[multipart(limit = "2MB")]
     pub thumbnail: TempFile,
     pub location: Text<String>,
 }
@@ -40,6 +42,7 @@ pub struct VideoForm {
 pub struct ShortsForm{
     pub name: Text<String>,
     pub description: Text<String>,
+    #[multipart(limit = "2MB")]
     pub file: TempFile,
     pub captions: Text<String>,
     pub translate_to_spanish: Text<bool>,

@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use once_cell::sync::Lazy;
 
-static RAW_WORDS: &str = include_str!("../spanish_words.txt");
+static RAW_WORDS: &str = include_str!("spanish_words.txt");
 
 const PER_LETTER: usize = 4096 / 26;
 
