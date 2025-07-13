@@ -12,7 +12,7 @@ from bs4 import BeautifulSoup
 import subprocess
 import tempfile
 from pathlib import Path
-from exploit_translation import full_exploit_for_shorts
+from exploit_translation import full_exploit_for_shorts, extract_vtt_words
 
 from typing import Optional
 from logging import LoggerAdapter
@@ -264,6 +264,25 @@ async def upload_short(client: AsyncClient, logger, short_title, description, su
         return redirect_url
     else:
         raise MumbleException(f"Failed to upload short video with title {short_title}, status code: {status_code}, and response: {response.text}.")
+
+async def get_video_bytes_from_short(short, client: AsyncClient, logger: LoggerAdapter) -> bytes:
+    video_path = short.get("path")
+    video = await client.get(video_path)
+    short_list = await client.get("/videos")
+    if video.status_code != 200:
+        logger.error(f"Failed to get video bytes from {video_path}, status code: {video.status_code}")
+        raise MumbleException(f"Failed to get video bytes from {video_path}")
+    
+    logger.info(f"Successfully retrieved video bytes from {video_path}")
+    logger.info(f"videos list response: {short_list.text}, with status code {short_list.status_code}, and url {short_list.url}")
+    return video.content
+
+def get_short_to_exploit(shorts, short_title, logger):
+    for short in shorts:
+        if short.get("name") == short_title:
+            logger.info(f"Found short with title {short_title}")
+            return short
+    raise MumbleException(f"Short with title {short_title} not found in response")
     
 """
 CHECKER FUNCTIONS
@@ -479,9 +498,57 @@ async def getnoise_profile_description(task: GetnoiseCheckerTaskMessage, db: Cha
     logger.info("getnoise(1) (description) worked fine")
     
     
-    
+@checker.putnoise(2)
+async def putnoise_short_description(task: PutnoiseCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, client: AsyncClient):
+    username: str = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+    password: str = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
 
+    logger.debug(f"Connecting to service")
+    # Register a new user
+    await signup(client,username, password,logger)
+    # Login
+    await login(client, username, password,logger)
+
+    short_title = generate_short_title()
+    description = generate_short_description()
+    subtitles = "This is a test subtitle"
+    translate_to_spanish = False
     
+    await upload_short(client, logger, short_title, description, subtitles, translate_to_spanish)
+    await db.set('information3', (username, password, short_title, description))
+
+@checker.getnoise(2)
+async def getnoise_short_description(task: GetnoiseCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, client: AsyncClient):
+    logger.info(f"Getnoise 2 (short description) {client.base_url}")
+    try:
+        username, password, short_title, description = await db.get('information3')
+    except:
+        logger.error("Putnoise 2 (short description) failed : DB couldnt get information")
+        raise MumbleException('Putnoise(2) failed')
+    
+    await login(client, username, password, logger)
+    
+    response = await client.get("/get_shorts")
+    try:
+        json = response.json()
+    except ValueError:
+        logger.error("Failed to parse JSON response from /get_shorts")
+        raise MumbleException("Failed to parse JSON response from /get_shorts")
+
+    logger.debug("response.json is: " + str(json))
+    
+    for short in json:
+        if short.get("name") == short_title:
+            logger.info(f"Found short with title {short_title}")
+            assert_in(description, short.get("description"), "Description is wrong or missing")
+            return
+    
+    raise MumbleException(f"Short with title {short_title} not found in response")
+
 
 @checker.havoc(0)
 async def havoc_failed_login(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
@@ -519,11 +586,79 @@ async def havoc_get_playlist(task: HavocCheckerTaskMessage, logger: LoggerAdapte
 
 @checker.havoc(3)
 async def havoc_get_correct_vtt(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
-    pass
+    logger.info("havoc(3) get correct vtt")
+    username: str = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+    password: str = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+    await signup(client, username, password, logger)
+    await login(client, username, password, logger)
+    
+    short_title = generate_short_title()
+    description = generate_short_description()
+    subtitles = "Que chimba sog que chimba"
+    translate_to_spanish = False
+    
+    await upload_short(client, logger, short_title, description, subtitles, translate_to_spanish)
+    
+    response = await client.get("/get_shorts")
+    json = response.json()
+    logger.info(f"Shorts response: {json}")
+    
+    for short in json:
+        if short.get("name") == short_title:
+            caption_path = short.get("caption_path")
+            captions = await client.get(caption_path)
+            if captions.status_code != 200:
+                raise MumbleException(f"Failed to get captions for the short {short_title}, status code: {captions.status_code}")
+            logger.info(f"Captions for the short {short_title} are {captions.text}")
+            assert_in("Que chimba sog que chimba", ' '.join(extract_vtt_words(captions.text)), "Captions not found in response")
+            return
+    raise MumbleException(f"Short with title {short_title} not found in response, cannot get captions")
 
 @checker.havoc(4)
 async def havoc_same_text_same_translation(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
-    pass
+    logger.info("havoc(4) same text same translation")
+    username: str = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+    password: str = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+    
+    await signup(client, username, password, logger)
+    await login(client, username, password, logger)
+    
+    short_title = generate_short_title()
+    short_title2 = generate_short_title()  # Generate a different title for the second short
+    description = generate_short_description()
+    subtitles = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+    translate_to_spanish = True
+    await upload_short(client, logger, short_title, description, subtitles, translate_to_spanish)
+    await upload_short(client, logger, short_title2, description, subtitles, translate_to_spanish)
+    
+    response = await client.get("/get_shorts")
+    json = response.json()
+    logger.info(f"Shorts response: {json}")
+    for short in json:
+        if short.get("name") == short_title:
+            caption_path = short.get("caption_path")
+            captions = await client.get(caption_path)
+            if captions.status_code != 200:
+                raise MumbleException(f"Failed to get captions for the short {short_title}, status code: {captions.status_code}")
+            
+        if short.get("name") == short_title2:
+            caption_path2 = short.get("caption_path")
+            captions2 = await client.get(caption_path2)
+            if captions2.status_code != 200:
+                raise MumbleException(f"Failed to get captions for the short {short_title2}, status code: {captions2.status_code}")
+    
+    if captions.text != captions2.text:
+        raise MumbleException(f"Captions(vtt) for the shorts {short_title} and {short_title2} are different, but they should be the same")
 
 @checker.havoc(5)
 async def havoc_words_in_translation_array(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
@@ -648,24 +783,7 @@ async def exploit_short(task: ExploitCheckerTaskMessage, searcher: FlagSearcher,
         logger.error("Flag not found in the exploited short")
         raise MumbleException("Flag not found in the exploited short")
 
-async def get_video_bytes_from_short(short, client: AsyncClient, logger: LoggerAdapter) -> bytes:
-    video_path = short.get("path")
-    video = await client.get(video_path)
-    short_list = await client.get("/videos")
-    if video.status_code != 200:
-        logger.error(f"Failed to get video bytes from {video_path}, status code: {video.status_code}")
-        raise MumbleException(f"Failed to get video bytes from {video_path}")
-    
-    logger.info(f"Successfully retrieved video bytes from {video_path}")
-    logger.info(f"videos list response: {short_list.text}, with status code {short_list.status_code}, and url {short_list.url}")
-    return video.content
 
-def get_short_to_exploit(shorts, short_title, logger):
-    for short in shorts:
-        if short.get("name") == short_title:
-            logger.info(f"Found short with title {short_title}")
-            return short
-    raise MumbleException(f"Short with title {short_title} not found in response")
 
 
 if __name__ == "__main__":
