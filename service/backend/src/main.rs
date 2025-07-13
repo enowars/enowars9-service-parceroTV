@@ -93,7 +93,7 @@ async fn check_credentials(
 
     let password = match maybe_password {
         Some(password) => password,
-        None => return Ok(HttpResponse::Unauthorized().body("User not auth!")),
+        None => return Ok(redirect!("/unauthorized")),
     };
 
     if password == typed_password {
@@ -104,7 +104,7 @@ async fn check_credentials(
         session.insert("user_id", user_id).unwrap();
         return Ok(redirect!("/app/home"));
     } else {
-        return Ok(HttpResponse::Unauthorized().body("User not auth!"));
+        return Ok(redirect!("/unauthorized"));
     }
 }
 
@@ -675,6 +675,7 @@ async fn main() -> std::io::Result<()> {
             .service(static_page!("/privacy", "privacy.html"))
             .service(static_page!("/jobs", "jobs.html"))
             .service(static_page!("/uploads_error", "uploads_error.html"))
+            .service(static_page!("/unauthorized", "unauthorized.html"))
             .service(Files::new("/js", "../frontend/js/").show_files_listing())
             .service(Files::new("/css", "../frontend/css/").show_files_listing())
             .service(Files::new("/assets", "../frontend/assets/").show_files_listing())

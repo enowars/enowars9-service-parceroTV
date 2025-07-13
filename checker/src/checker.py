@@ -70,7 +70,7 @@ async def login(client: AsyncClient, username:str, password: str, logger):
     response = await client.post("/checkcredentials", data=login_data)
     logger.info(f"Response of /checkcredentials with status: {response.status_code} and with content {response.text}")
     status_code = response.status_code
-    if status_code in [303]:
+    if status_code in [303] and response.headers.get("Location") == "/app/home":
         logger.info(f"Successfull login of user {username} with redirection {status_code} ")
     else:
         logger.error(f"Failed Login of user {username} status code: {status_code}")
@@ -485,13 +485,36 @@ async def getnoise_profile_description(task: GetnoiseCheckerTaskMessage, db: Cha
 
 @checker.havoc(0)
 async def havoc_failed_login(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
-    pass
+    username: str = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+    password: str = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+
+    try:
+        failed_login = await login(client, username, password, logger)
+    except MumbleException as e:
+        logger.info(f"Failed login for user {username} with password {password} raised MumbleException: {e} like expected")
+        return
+    
+    raise MumbleException(f"Failed to get unauthorized response for user {username} with password {password}")
+    
+    logger.info(f"havoc(0) FAILED login worked fine for user {username} with password {password}")
+
 @checker.havoc(1)
 async def havoc_get_logo(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
-    pass
+    logger.info("havoc(1) get logo")
+    response = await client.get("/assets/ParcerroTV.svg")
+    if response.status_code != 200:
+        raise MumbleException(f"Failed to get ParceroTV svg logo, status code: {response.status_code}")
+    
+    logger.info("havoc(1) get logo worked fine")
+    assert_in("<svg", response.text, "Logo SVG not found in response")
 
 @checker.havoc(2)
-async def havoc_get_video(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
+async def havoc_get_playlist(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
+    logger.info("havoc(2) get playlist")
     pass
 
 @checker.havoc(3)

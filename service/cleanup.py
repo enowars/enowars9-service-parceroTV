@@ -30,11 +30,14 @@ while True:
     cursor.execute("DELETE FROM users WHERE created_at < ?", (cutoff_time.strftime("%Y-%m-%d %H:%M:%S"), ))
     cursor.execute("DELETE FROM videos WHERE created_at < ?", (cutoff_time.strftime("%Y-%m-%d %H:%M:%S"), ))
     cursor.execute("DELETE FROM comments WHERE created_at < ?", (cutoff_time.strftime("%Y-%m-%d %H:%M:%S"), ))
+    cursor.execute("DELETE FROM shorts WHERE created_at < ?", (cutoff_time.strftime("%Y-%m-%d %H:%M:%S"), ))
 
     #Delete Files in directory
     delete_old_files("/service/data/videos/", DELETE_TIMEINTEVALL)
     delete_old_files("/service/data/thumbnails/", DELETE_TIMEINTEVALL)
     delete_old_files("/service/data/private/", DELETE_TIMEINTEVALL)
+    delete_old_files("/service/data/shorts/", DELETE_TIMEINTEVALL)
+    delete_old_files("/service/data/vtt/", DELETE_TIMEINTEVALL)
     connection.commit()
     connection.close()
 
