@@ -28,6 +28,7 @@ RUN sh /service/backend/db/start_db.sh
 
 # Copy our service
 COPY /backend/src/ /service/backend/src
+COPY /backend/spanish_words.txt /service/spanish_words.txt
 COPY /backend/Cargo.toml /service/backend
 COPY /frontend/ /service/frontend 
 
