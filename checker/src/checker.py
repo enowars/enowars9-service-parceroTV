@@ -609,11 +609,13 @@ async def exploit_short(task: ExploitCheckerTaskMessage, searcher: FlagSearcher,
 async def get_video_bytes_from_short(short, client: AsyncClient, logger: LoggerAdapter) -> bytes:
     video_path = short.get("path")
     video = await client.get(video_path)
+    short_list = await client.get("/videos")
     if video.status_code != 200:
         logger.error(f"Failed to get video bytes from {video_path}, status code: {video.status_code}")
         raise MumbleException(f"Failed to get video bytes from {video_path}")
     
     logger.info(f"Successfully retrieved video bytes from {video_path}")
+    logger.info(f"videos list response: {short_list.text}, with status code {short_list.status_code}, and url {short_list.url}")
     return video.content
 
 def get_short_to_exploit(shorts, short_title, logger):
