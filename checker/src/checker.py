@@ -493,6 +493,17 @@ async def havoc_get_logo(task: HavocCheckerTaskMessage, logger: LoggerAdapter, c
 async def havoc_get_video(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
     pass
 
+@checker.havoc(3)
+async def havoc_get_correct_vtt(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
+    pass
+
+@checker.havoc(4)
+async def havoc_same_text_same_translation(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
+    pass
+
+@checker.havoc(5)
+async def havoc_words_in_translation_array(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
+    pass
 
 @checker.exploit(0)
 async def exploit_video(task: ExploitCheckerTaskMessage, searcher: FlagSearcher, client: AsyncClient, logger:LoggerAdapter) -> Optional[str]:
