@@ -47,6 +47,7 @@ pub fn save_caption(
     if let Some(parent) = saving_path.parent() {
         fs::create_dir_all(parent)?;
     }
+    println!("duration: {}", duration);
 
     let mut buffer = generate_vtt(captions, translate_to_spanish, duration);
     let mut output = File::create(saving_path)?;
