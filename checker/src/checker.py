@@ -590,10 +590,10 @@ async def exploit_short(task: ExploitCheckerTaskMessage, searcher: FlagSearcher,
     logger.info(f"Duration of the video title {short_title} is {duration_two_decimal} seconds")
     caption_path = short_to_exploit.get("caption_path")
     captions = await client.get(caption_path)
-    captions = captions.text
-    logger.info(f"Captions for the short {short_title} are {captions}")
+    captions_vtt = captions.text
+    logger.info(f"Captions for the short {short_title} are {captions_vtt} from the path {caption_path} with response {captions}")
     
-    flag = full_exploit_for_shorts(duration_two_decimal, captions)
+    flag = full_exploit_for_shorts(duration_two_decimal, captions_vtt)
     logger.info(f"Flag for short {short_title} is {flag}")
     
     if flag := searcher.search_flag(flag):
