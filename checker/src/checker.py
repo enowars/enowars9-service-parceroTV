@@ -207,18 +207,31 @@ async def upload_public_video(client: AsyncClient, logger, title, description):
        return redirect_url 
     else:
        raise MumbleException(f"failed to upload public video {title}")
-   
+
+def get_duration(filename):
+    result = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries",
+         "format=duration", "-of",
+         "default=noprint_wrappers=1:nokey=1", filename],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT
+    )
+    return float(result.stdout)
+
 async def upload_short(client: AsyncClient, logger, short_title, description, subtitles, translate_to_spanish):
     """Upload a short video with the given title, description, subtitles and translation option."""
     logger.info(f"Uploading short video with title: {short_title}, description: {description}, subtitles: {subtitles}, translate_to_spanish: {translate_to_spanish}")
     
     with open(get_random_video_path(), "rb") as video_file:
+        duration = get_duration(video_file.name)
+        logger.info(f"Video duration: {duration} seconds, {video_file.name}")
         files = {
             "name": (None, short_title),
             "description": (None, description),
             "captions": (None, subtitles),
             "translate_to_spanish": (None, str(translate_to_spanish).lower()),
             "file": (Path(video_file.name).name, video_file, "video/mp4"),
+            "duration": (None, str(duration)),
         }
         
         response = await client.post("/app/create_short", files=files)
@@ -233,7 +246,7 @@ async def upload_short(client: AsyncClient, logger, short_title, description, su
         logger.info(f"Redirected to: {redirect_url}")
         return redirect_url
     else:
-        raise MumbleException(f"Failed to upload short video with title {short_title}, status code: {status_code}")
+        raise MumbleException(f"Failed to upload short video with title {short_title}, status code: {status_code}, and response: {response.text}.")
     
 """
 CHECKER FUNCTIONS
@@ -322,6 +335,7 @@ async def putflag_short(
     await upload_short(client, logger, short_title, description, subtitles, translate_to_spanish)
 
     await db.set("userdata2", (username, password, short_title))
+    logger.info(f"User data saved for {username}, and uploaded successfully")
 
 @checker.getflag(1)
 async def getflag_short(
@@ -336,15 +350,21 @@ async def getflag_short(
     await login(client, username, password,logger)
     
     logger.info(f"try to access flag in /app/get_shorts")
-    response = await client.get("/app/get_shorts")
-    json = response.json()
+    response = await client.get("/get_shorts")
+    try:
+        json = response.json()
+    except ValueError:
+        logger.error("Failed to parse JSON response")
+        raise MumbleException("Failed to parse JSON response from /get_shorts")
+
     logger.debug("response.json is: " + str(json))
     
     # Check if the short with the title exists
     for short in json:
-        if short.get("title") == short_title:
+        #logger.info(f"Checking short: {short.get('title')}")
+        if short.get("name") == short_title:
             logger.info(f"Found short with title {short_title}")
-            assert_in(task.flag, short.get("original_shorts"), "Flag missing")
+            assert_in(task.flag, short.get("original_captions"), "Flag missing")
             return
     
     raise MumbleException(f"Short with title {short_title} not found in response")
