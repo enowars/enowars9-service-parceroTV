@@ -2,6 +2,7 @@ from asyncio import StreamReader, StreamWriter
 import asyncio
 import random
 import string
+from time import sleep
 import faker
 import os
 from httpx import AsyncClient, Response
@@ -589,6 +590,7 @@ async def exploit_short(task: ExploitCheckerTaskMessage, searcher: FlagSearcher,
     duration_two_decimal = round(duration, 2)
     logger.info(f"Duration of the video title {short_title} is {duration_two_decimal} seconds")
     caption_path = short_to_exploit.get("caption_path")
+    sleep(10)
     captions = await client.get(caption_path)
     vtts = await client.get("/vtt")
     captions_vtt = captions.text
