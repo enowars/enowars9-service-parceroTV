@@ -13631,7 +13631,7 @@ babucha
 babuchera
 babuchero
 babuino
-baby doll
+babydoll
 baby-sitter
 baca
 bacalada
@@ -32958,7 +32958,7 @@ d
 dable
 daca
 dacá
-da capo
+dacapo
 dacha
 dacia
 dacio
@@ -33025,7 +33025,7 @@ dajabonero
 dajao
 dala
 dalaga
-dalái lama
+daláilama
 dalgo
 dalia
 daliniana
@@ -55736,7 +55736,7 @@ habanera
 habanero
 habano
 habar
-habeas corpus
+habeascorpus
 habedera
 habedero
 habemus
@@ -75128,7 +75128,7 @@ obispalía
 obispar
 obispillo
 obispo
-obiter dictum
+obiterdictum
 óbito
 obituario
 objeción
@@ -86917,7 +86917,7 @@ rabaniza
 rábano
 rabárbaro
 rabasaire
-rabassa morta
+rabassamorta
 rabatí
 rabazo
 rabazuz
@@ -97994,9 +97994,9 @@ tabulación
 tabulado
 tabulador
 tabuladora
-tabula gratulatoria
+tabulagratulatoria
 tabular
-tabula rasa
+tabularasa
 taburete
 tac
 taca
@@ -104291,13 +104291,13 @@ vadear
 vademécum
 vadeo
 vadera
-vade retro
+vaderetro
 vadiana
 vadiano
 vado
 vadosa
 vadoso
-vae victis
+vaevictis
 vafear
 vafo
 vafosa

