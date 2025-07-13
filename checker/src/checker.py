@@ -90,6 +90,17 @@ def generate_description() -> str:
 def generate_about() -> str:
     return "aasd"
 
+def generate_short_title() -> str:
+    """Generate a random title for a short video."""
+    adj = random.choice(adjectives)
+    content = random.choice(content_types)
+    number = random.randint(1, 1000000)
+    return f"short-{adj}-{content}-{number}"
+
+def generate_short_description() -> str:
+    """Generate a random description for a short video."""
+    return f"{random.choice(german_proverbs)} {random.randint(1, 10)}"
+
 def get_random_video_path(path="videos") -> str:
     video_extensions = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".flv"}
     with os.scandir(path) as entries:
@@ -196,10 +207,39 @@ async def upload_public_video(client: AsyncClient, logger, title, description):
        return redirect_url 
     else:
        raise MumbleException(f"failed to upload public video {title}")
+   
+async def upload_short(client: AsyncClient, logger, short_title, description, subtitles, translate_to_spanish):
+    """Upload a short video with the given title, description, subtitles and translation option."""
+    logger.info(f"Uploading short video with title: {short_title}, description: {description}, subtitles: {subtitles}, translate_to_spanish: {translate_to_spanish}")
+    
+    with open(get_random_video_path(), "rb") as video_file:
+        files = {
+            "name": (None, short_title),
+            "description": (None, description),
+            "captions": (None, subtitles),
+            "translate_to_spanish": (None, str(translate_to_spanish).lower()),
+            "file": (Path(video_file.name).name, video_file, "video/mp4"),
+        }
+        
+        response = await client.post("/app/create_short", files=files)
+    
+    status_code = response.status_code
+    if status_code == 404:
+        logger.info(f"Client error {status_code} with {response.text}")
+   
+    if status_code in [303]:
+        logger.info(f"Short video was successfully uploaded")
+        redirect_url = response.headers.get("Location")
+        logger.info(f"Redirected to: {redirect_url}")
+        return redirect_url
+    else:
+        raise MumbleException(f"Failed to upload short video with title {short_title}, status code: {status_code}")
     
 """
 CHECKER FUNCTIONS
 """
+
+## PUTFLAG AND GETFLAG FUNCTIONS
 
 @checker.putflag(0)
 async def putflag_video(
@@ -254,6 +294,61 @@ async def getflag_video(
     assert_in(task.flag, response.text, "Flag missing")
         
 
+@checker.putflag(1)
+async def putflag_short(
+    task: PutflagCheckerTaskMessage,
+    db: ChainDB,
+    client: AsyncClient,
+    logger: LoggerAdapter,    
+) -> None:
+    username: str = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+    password: str = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+
+    logger.debug(f"Connecting to service")
+    # Register a new user
+    await signup(client,username, password,logger)
+    # Login
+    await login(client, username, password,logger)
+    
+    short_title = generate_short_title()
+    description = generate_short_description()
+    subtitles = task.flag
+    translate_to_spanish = True
+    
+    await upload_short(client, logger, short_title, description, subtitles, translate_to_spanish)
+
+    await db.set("userdata2", (username, password, short_title))
+
+@checker.getflag(1)
+async def getflag_short(
+    task: GetflagCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, client: AsyncClient
+) -> None:
+    try:
+        username, password, short_title = await db.get("userdata2")
+    except KeyError:
+        raise MumbleException("Missing database entry from putflag")
+    
+    logger.debug(f"getflag(1) for the user {username} and short {short_title} flag should be {task.flag}")
+    await login(client, username, password,logger)
+    
+    logger.info(f"try to access flag in /app/get_shorts")
+    response = await client.get("/app/get_shorts")
+    json = response.json()
+    logger.debug("response.json is: " + str(json))
+    
+    # Check if the short with the title exists
+    for short in json:
+        if short.get("title") == short_title:
+            logger.info(f"Found short with title {short_title}")
+            assert_in(task.flag, short.get("original_shorts"), "Flag missing")
+            return
+    
+    raise MumbleException(f"Short with title {short_title} not found in response")
+
 @checker.putnoise(0)
 async def putnoise_video(task: PutnoiseCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, client: AsyncClient):
     logger
@@ -277,6 +372,7 @@ async def putnoise_video(task: PutnoiseCheckerTaskMessage, db: ChainDB, logger: 
     
     await db.set('information', (username, password, title, description))
    
+
 
 @checker.getnoise(0)
 async def getnoise_video(task: GetnoiseCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, client: AsyncClient):
@@ -358,6 +454,7 @@ async def havoc_get_logo(task: HavocCheckerTaskMessage, logger: LoggerAdapter, c
 @checker.havoc(2)
 async def havoc_get_video(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
     pass
+
 
 @checker.exploit(0)
 async def exploit_video(task: ExploitCheckerTaskMessage, searcher: FlagSearcher, client: AsyncClient, logger:LoggerAdapter) -> Optional[str]:
