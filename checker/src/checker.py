@@ -506,6 +506,24 @@ async def havoc_same_text_same_translation(task: HavocCheckerTaskMessage, logger
 async def havoc_words_in_translation_array(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
     pass
 
+@checker.havoc(6)
+async def havoc_get_vtt_index(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
+    username_attacker: str = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+    password_attacker: str = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+    
+    await signup(client, username_attacker, password_attacker, logger)
+    await login(client, username_attacker, password_attacker, logger)
+    
+    vtts = await client.get("/vtt")
+    if vtts.status_code != 200:
+        raise MumbleException("Failed to get VTTs")
+    logger.info(f"VTTs response: {vtts.text}")
+    assert_in("vtt", vtts.text, "VTTs not found in response")
+
 @checker.exploit(0)
 async def exploit_video(task: ExploitCheckerTaskMessage, searcher: FlagSearcher, client: AsyncClient, logger:LoggerAdapter) -> Optional[str]:
     username_attacker: str = "".join(
@@ -590,7 +608,6 @@ async def exploit_short(task: ExploitCheckerTaskMessage, searcher: FlagSearcher,
     duration_two_decimal = round(duration, 2)
     logger.info(f"Duration of the video title {short_title} is {duration_two_decimal} seconds")
     caption_path = short_to_exploit.get("caption_path")
-    sleep(10)
     captions = await client.get(caption_path)
     vtts = await client.get("/vtt")
     captions_vtt = captions.text
