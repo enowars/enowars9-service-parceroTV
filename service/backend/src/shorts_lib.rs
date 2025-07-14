@@ -47,7 +47,6 @@ pub fn save_caption(
     if let Some(parent) = saving_path.parent() {
         fs::create_dir_all(parent)?;
     }
-    println!("duration: {}", duration);
 
     let mut buffer = generate_vtt(captions, translate_to_spanish, duration);
     let mut output = File::create(saving_path)?;
@@ -102,8 +101,6 @@ pub fn generate_vtt(captions: &str, translate: bool, duration: f64) -> Vec<u8> {
 fn translate_to_spanish(captions: &str, duration: f64) -> String {
     let transform_stream = get_transform_stream(captions.as_bytes(), duration);
 
-    println!("Original length of bytes in captions: {}", captions.len());
-    println!("Length of transform_stream: {}", transform_stream.len());
     let mut bits: u32 = 0;
     let mut bits_count: u8 = 0;
     let mut words = Vec::new();
@@ -111,23 +108,16 @@ fn translate_to_spanish(captions: &str, duration: f64) -> String {
     for &byte in &transform_stream {
         bits = (bits << 8) | (byte as u32);
         bits_count += 8;
-        println!(
-            "byte: {} Current bits: {:032b}, bits_count: {}",
-            byte, bits, bits_count
-        );
 
         while bits_count >= 12 {
             bits_count -= 12;
             let idx = ((bits >> bits_count) & 0xFFF) as usize;
-            println!("Index: {}", idx);
             words.push(SPANISH_WORDS[idx]);
         }
     }
 
     if bits_count > 0 {
         let idx = ((bits << (12 - bits_count)) & 0xFFF) as usize;
-        println!(" Current bits: {:032b}, bits_count: {}", bits, bits_count);
-        println!("Index: {}", idx);
         words.push(SPANISH_WORDS[idx]);
     }
 
@@ -139,7 +129,6 @@ fn get_transform_stream(words: &[u8], duration: f64) -> Vec<u8> {
     let ms = NonZeroU64::new(ms).unwrap_or(NonZeroU64::new(1).unwrap());
     let mut seed = [0u8; 32];
     seed[..8].copy_from_slice(&ms.get().to_le_bytes());
-    println!("Seed: {:?}", seed);
     let mut rng = ChaCha20Rng::from_seed(seed);
 
     words.iter()
