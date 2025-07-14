@@ -12,8 +12,8 @@ services:
       - MONGO_PORT=27017
       - MONGO_USER=parcerotv
       - MONGO_PASSWORD=parcerotv
-    mem_limit: 1G
-    memswap_limit: 2G
+    mem_limit: 2G
+    memswap_limit: 4G
     ulimits:
       core:
         soft: 0
