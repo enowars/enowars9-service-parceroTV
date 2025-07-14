@@ -234,15 +234,20 @@ def get_duration_from_bytes(video_bytes):
         )
         return float(result.stdout)
 
+saved_duration = {"videos/bugs.mp4": 4.6, "videos/ok.mp4": 2.5}  
+def get_saved_video_duration(video_path):
+    return saved_duration.get(video_path)
+
 async def upload_short(client: AsyncClient, logger, short_title, description, subtitles, translate_to_spanish, upload_same_video = False) -> str:
     """Upload a short video with the given title, description, subtitles and translation option."""
     logger.info(f"Uploading short video with title: {short_title}, description: {description}, subtitles: {subtitles}, translate_to_spanish: {translate_to_spanish}")
     video_path = get_random_video_path()
     if upload_same_video:
         video_path = os.path.join("videos", "bugs.mp4")
+    duration = get_saved_video_duration(video_path)
     with open(video_path, "rb") as video_file:
-        duration = get_duration(video_file.name)
         duration = round(duration, 2)  # Round to 2 decimal places Like in Client javascript
+        print(f"\n\n\n\n Video duration: {duration} seconds, video file: {video_file.name}\n\n\n\n")
         logger.info(f"Video duration: {duration} seconds, {video_file.name}")
         files = {
             "name": (None, short_title),
