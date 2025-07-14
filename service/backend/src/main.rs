@@ -2,9 +2,9 @@ use std::path::PathBuf;
 mod spanish_dictionary;
 use actix_files::Files;
 use actix_files::NamedFile;
+use actix_multipart::MultipartError;
 use actix_multipart::form::MultipartForm;
 use actix_multipart::form::MultipartFormConfig;
-use actix_multipart::MultipartError;
 use actix_session::config::PersistentSession;
 use actix_web::HttpRequest;
 use actix_web::cookie::time::Duration;
@@ -21,9 +21,10 @@ use backend::save_video;
 
 use db::{
     create_comment, get_all_videos, increase_view_count_db, is_video_private,
-    select_comments_by_video_id, select_my_videos, select_private_videos_by_userid, select_user_id,
-    select_user_info, select_user_info_with_name, select_video_by_path, select_videos_by_userid,
-    update_about_user, update_dislike_db, update_like_db, user_has_permission, select_shorts
+    select_comments_by_video_id, select_my_videos, select_private_videos_by_userid, select_shorts,
+    select_user_id, select_user_info, select_user_info_with_name, select_video_by_path,
+    select_videos_by_userid, update_about_user, update_dislike_db, update_like_db,
+    user_has_permission,
 };
 
 mod shorts_lib;
@@ -39,6 +40,7 @@ use actix_session::storage::CookieSessionStore;
 use actix_session::{Session, SessionMiddleware};
 use actix_web::cookie::{Key, SameSite};
 use db::{Pool, create_user, get_db_conn, insert_video, select_password};
+use rusqlite::OpenFlags;
 use rusqlite::types::Null;
 
 use crate::db::get_like_status_db;
@@ -268,9 +270,13 @@ async fn create_short(
         };
         let short_path = save_short(short_to_save)?;
         let caption_path = match captions.as_ref() {
-                    Some(captions) => Some(save_caption(captions, *short_form.translate_to_spanish, *short_form.duration)?),
-                    None => None,
-                };
+            Some(captions) => Some(save_caption(
+                captions,
+                *short_form.translate_to_spanish,
+                *short_form.duration,
+            )?),
+            None => None,
+        };
 
         let conn = get_db_conn(&pool).await?;
         let _ = web::block(move || {
@@ -588,21 +594,27 @@ async fn get_shorts(session: Session, pool: web::Data<Pool>) -> Result<impl Resp
     }
 }
 
-
 #[get("/shorts/{filename}")]
-async fn stream_shorts(req: HttpRequest, path: web::Path<String>, session: Session) -> Result<impl Responder, Error> {
+async fn stream_shorts(
+    req: HttpRequest,
+    path: web::Path<String>,
+    session: Session,
+) -> Result<impl Responder, Error> {
     if let Ok(Some(user_id)) = session.get::<i32>("user_id") {
         let filename = path.into_inner();
 
-    if filename.contains("..") || filename.contains('/') || filename.contains('\\') {
-        return Ok(HttpResponse::BadRequest().body("Invalid filename"));
-    }
+        if filename.contains("..") || filename.contains('/') || filename.contains('\\') {
+            return Ok(HttpResponse::BadRequest().body("Invalid filename"));
+        }
 
-    let mut file_path = PathBuf::from("../data/shorts/");
-    file_path.push(&filename);
+        let mut file_path = PathBuf::from("../data/shorts/");
+        file_path.push(&filename);
 
-    let file = NamedFile::open(file_path)?;
-    Ok(file.use_last_modified(true).prefer_utf8(true).into_response(&req))
+        let file = NamedFile::open(file_path)?;
+        Ok(file
+            .use_last_modified(true)
+            .prefer_utf8(true)
+            .into_response(&req))
     } else {
         Ok(redirect!("/"))
     }
@@ -639,18 +651,36 @@ fn session_middleware() -> SessionMiddleware<CookieSessionStore> {
         .build()
 }
 
-fn handle_multipart_error(err: actix_multipart::MultipartError, _req: &HttpRequest) -> actix_web::Error {
+fn handle_multipart_error(
+    err: actix_multipart::MultipartError,
+    _req: &HttpRequest,
+) -> actix_web::Error {
     println!("To large multipart request: {}", err);
-    let response = HttpResponse::BadRequest()
-        .force_close()
-        .finish();
+    let response = HttpResponse::BadRequest().force_close().finish();
     actix_web::error::InternalError::from_response(err, response).into()
 }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let db_path = std::env::var("DATABASE_PATH").unwrap_or_else(|_| "../data/parcerotv.db".into());
-    let manager = SqliteConnectionManager::file(&db_path);
+    let manager = SqliteConnectionManager::file(&db_path)
+        .with_flags(
+            OpenFlags::SQLITE_OPEN_READ_WRITE
+                | OpenFlags::SQLITE_OPEN_CREATE
+                | OpenFlags::SQLITE_OPEN_NO_MUTEX, // optional but safe for threads
+        )
+        .with_init(|conn| {
+            conn.execute_batch(
+                "
+                PRAGMA journal_mode = WAL;
+                PRAGMA synchronous = OFF;
+                PRAGMA foreign_keys = ON;
+                PRAGMA temp_store = MEMORY;
+                PRAGMA cache_size = -50000;
+
+                ",
+            )
+        });
     let pool = Pool::new(manager).unwrap();
 
     HttpServer::new(move || {
@@ -659,7 +689,12 @@ async fn main() -> std::io::Result<()> {
             .wrap(middleware::DefaultHeaders::new().add(("X-Content-Type-Options", "nosniff")))
             .app_data(web::Data::new(pool.clone()))
             .app_data(web::PayloadConfig::new(TWO_MB))
-            .app_data(MultipartFormConfig::default().total_limit(TWO_MB).memory_limit(TWO_MB).error_handler(handle_multipart_error))
+            .app_data(
+                MultipartFormConfig::default()
+                    .total_limit(TWO_MB)
+                    .memory_limit(TWO_MB)
+                    .error_handler(handle_multipart_error),
+            )
             .service(newuser)
             .service(start_page)
             .service(check_credentials)

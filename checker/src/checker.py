@@ -73,7 +73,7 @@ async def login(client: AsyncClient, username:str, password: str, logger):
     if status_code in [303] and response.headers.get("Location") == "/app/home":
         logger.info(f"Successfull login of user {username} with redirection {status_code} ")
     else:
-        logger.error(f"Failed Login of user {username} status code: {status_code}")
+        logger.error(f"Failed Login of user {username} status code: {status_code}, headers: {response.headers}")
         raise MumbleException(f"Failed Login of user {username} with password: {password} should be Unauthozired {status_code}")
 
 def generate_title() -> str:
@@ -702,7 +702,7 @@ async def havoc_vtt_words_in_translation_array(task: HavocCheckerTaskMessage, lo
             
     for word in vtt_words:
         assert_in(word, wordlist, f"Word '{word}' from VTT not found in translation array")
-    
+
 
 @checker.havoc(6)
 async def havoc_get_vtt_index(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):

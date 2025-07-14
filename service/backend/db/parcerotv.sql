@@ -88,5 +88,17 @@ SELECT *
 FROM videos
 WHERE is_private = 1;
 
+-- Indexes for performance optimization
+CREATE INDEX idx_videos_is_private ON videos(is_private);
+CREATE INDEX idx_videos_userid_created_at ON videos(userID, created_at DESC);
+CREATE INDEX idx_videos_private_userid ON videos(is_private, userID);
+CREATE UNIQUE INDEX ux_videos_path ON videos(path);
+
+CREATE INDEX idx_comments_video_created ON comments(VideoID, created_at DESC);
+CREATE INDEX idx_comments_userid ON comments(UserID);
+
+CREATE INDEX idx_shorts_created_at ON shorts(created_at DESC);
+
+CREATE UNIQUE INDEX ux_users_name ON users(name);
 
 PRAGMA foreign_keys = ON;
