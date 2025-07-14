@@ -1,14 +1,8 @@
-from asyncio import StreamReader, StreamWriter
-import asyncio
 import random
 import string
-from time import sleep
-import faker
 import os
-from httpx import AsyncClient, Response
+from httpx import AsyncClient
 from names import adjectives, content_types, cities, countries, german_proverbs
-import ffmpeg
-from bs4 import BeautifulSoup
 import subprocess
 import tempfile
 from pathlib import Path
@@ -22,19 +16,15 @@ from enochecker3 import (
     Enochecker,
     ExploitCheckerTaskMessage,
     FlagSearcher,
-    BaseCheckerTaskMessage,
     PutflagCheckerTaskMessage,
     GetflagCheckerTaskMessage,
     PutnoiseCheckerTaskMessage,
     GetnoiseCheckerTaskMessage,
     HavocCheckerTaskMessage,
     MumbleException,
-    OfflineException,
-    InternalErrorException,
     PutflagCheckerTaskMessage,
-    AsyncSocket,
 )
-from enochecker3.utils import assert_equals, assert_in
+from enochecker3.utils import assert_in
 
 """
 Checker config
@@ -51,27 +41,29 @@ Utility functions
 """
 
 async def signup(client: AsyncClient, username: str, password:str, logger):
-    logger.info(f"Starting signup process for user: {username}")
+    #logger.info(f"Starting signup process for user: {username}")
     signup_data = {"username": username,
                    "password": password}
     response = await client.post("/newuser", data=signup_data)
     status_code = response.status_code
-    logger.info(f"Received status code {status_code} for signup process")
+    #logger.info(f"Received status code {status_code} for signup process")
     if status_code in [303]:
-        logger.info(f"user:{username} successfully registered with content to {response.text}")
+        #logger.info(f"user:{username} successfully registered with content to {response.text}")
+        ok = 1
     else:
         logger.error(f"Failed to sign up user, status_code: {status_code}")
         raise MumbleException(f"Failed to sign up user, status_code: {status_code}")
 
 async def login(client: AsyncClient, username:str, password: str, logger):
-    logger.info(f"Starting login process for user: {username} and password {password}")
+    #logger.info(f"Starting login process for user: {username} and password {password}")
     login_data = {"username": username,
                    "password": password}
     response = await client.post("/checkcredentials", data=login_data)
-    logger.info(f"Response of /checkcredentials with status: {response.status_code} and with content {response.text}")
+    #logger.info(f"Response of /checkcredentials with status: {response.status_code} and with content {response.text}")
     status_code = response.status_code
     if status_code in [303] and response.headers.get("Location") == "/app/home":
-        logger.info(f"Successfull login of user {username} with redirection {status_code} ")
+        #logger.info(f"Successfull login of user {username} with redirection {status_code} ")
+        ok = 1
     else:
         logger.error(f"Failed Login of user {username} status code: {status_code}, headers: {response.headers}")
         raise MumbleException(f"Failed Login of user {username} with password: {password} should be Unauthozired {status_code}")
@@ -137,7 +129,7 @@ def create_video_with_metadata(creator: str, location, title,logger, is_exploit=
         path = f'/tmp/metadata_{title}_{random.randint(1000,9999)}.mp4'
     video_path = get_random_video_path()
     
-    logger.info(f"Changing the metadata of the Video {title} with location {location} from creator {creator} saved at {path}, from the video \n {video_path}")
+    #logger.info(f"Changing the metadata of the Video {title} with location {location} from creator {creator} saved at {path}, from the video \n {video_path}")
     
     cmd = [
         "ffmpeg",
@@ -152,13 +144,13 @@ def create_video_with_metadata(creator: str, location, title,logger, is_exploit=
     subprocess.run(cmd, check=True)
     # mp4_path = path.replace(".mkv", ".mp4")
     # os.rename(path, mp4_path)
-    logger.info("Metdata_video build successfully")
+    #logger.info("Metdata_video build successfully")
     return path
   
     
 async def upload_private_video(client: AsyncClient, description, location, title, logger, path)-> str:
    """Upload a private video, description is the flag store"""
-   logger.info(f"uploading a private video")
+   #logger.info(f"uploading a private video")
    with open(path, "rb") as video_file, open(get_random_thumbnail_path(), "rb") as thumb:
     files = {
         "name": (None, title),
@@ -169,17 +161,17 @@ async def upload_private_video(client: AsyncClient, description, location, title
         "thumbnail": ("thumbnail.png", thumb, "image/png"),
     }
     
-    logger.info(f"Uploading file {Path(path).name}, from path {path}")
+    #logger.info(f"Uploading file {Path(path).name}, from path {path}")
     response = await client.post("/app/create_video", files=files)
    
    status_code = response.status_code
    if status_code == 404:
-        logger.info(f"Client error {status_code} with {response.text}")
-   
+        #logger.info(f"Client error {status_code} with {response.text}")
+       ok = 1
    if status_code in [303]:
-       logger.info(f"Video was succesfully uploaded")
+       #logger.info(f"Video was succesfully uploaded")
        redirect_url = response.headers.get("Location")
-       logger.info(f"Redirected to: {redirect_url}")
+       #logger.info(f"Redirected to: {redirect_url}")
        return redirect_url 
    else:
        raise MumbleException(f"failed to upload video {title}, with location: {location}")
@@ -197,16 +189,16 @@ async def upload_public_video(client: AsyncClient, logger, title, description):
         "file": (Path(video_path).name, video_file, "video/mp4"),
         "thumbnail": ("thumbnail.png", thumb, "image/png"),
     }
-        logger.info(f"Uploading public video {video_path}")
+        #logger.info(f"Uploading public video {video_path}")
         response = await client.post("/app/create_video", files=files)
     status_code = response.status_code
     if status_code == 404:
-        logger.info(f"Client error {status_code} with {response.text}")
-   
+        #logger.info(f"Client error {status_code} with {response.text}")
+        ok = 1
     if status_code in [303]:
-       logger.info(f"Video was succesfully uploaded")
+       #logger.info(f"Video was succesfully uploaded")
        redirect_url = response.headers.get("Location")
-       logger.info(f"Redirected to: {redirect_url}")
+       #logger.info(f"Redirected to: {redirect_url}")
        return redirect_url 
     else:
        raise MumbleException(f"failed to upload public video {title}")
@@ -240,7 +232,7 @@ def get_saved_video_duration(video_path):
 
 async def upload_short(client: AsyncClient, logger, short_title, description, subtitles, translate_to_spanish, upload_same_video = False) -> str:
     """Upload a short video with the given title, description, subtitles and translation option."""
-    logger.info(f"Uploading short video with title: {short_title}, description: {description}, subtitles: {subtitles}, translate_to_spanish: {translate_to_spanish}")
+    #logger.info(f"Uploading short video with title: {short_title}, description: {description}, subtitles: {subtitles}, translate_to_spanish: {translate_to_spanish}")
     video_path = get_random_video_path()
     if upload_same_video:
         video_path = os.path.join("videos", "bugs.mp4")
@@ -248,7 +240,7 @@ async def upload_short(client: AsyncClient, logger, short_title, description, su
     with open(video_path, "rb") as video_file:
         duration = round(duration, 2)  # Round to 2 decimal places Like in Client javascript
         print(f"\n\n\n\n Video duration: {duration} seconds, video file: {video_file.name}\n\n\n\n")
-        logger.info(f"Video duration: {duration} seconds, {video_file.name}")
+        #logger.info(f"Video duration: {duration} seconds, {video_file.name}")
         files = {
             "name": (None, short_title),
             "description": (None, description),
@@ -262,12 +254,12 @@ async def upload_short(client: AsyncClient, logger, short_title, description, su
     
     status_code = response.status_code
     if status_code == 404:
-        logger.info(f"Client error {status_code} with {response.text}")
-   
+        #logger.info(f"Client error {status_code} with {response.text}")
+        ok = 1
     if status_code in [303]:
-        logger.info(f"Short video was successfully uploaded")
+        #logger.info(f"Short video was successfully uploaded")
         redirect_url = response.headers.get("Location")
-        logger.info(f"Redirected to: {redirect_url}")
+        #logger.info(f"Redirected to: {redirect_url}")
         return redirect_url
     else:
         raise MumbleException(f"Failed to upload short video with title {short_title}, status code: {status_code}, and response: {response.text}.")
@@ -280,14 +272,14 @@ async def get_video_bytes_from_short(short, client: AsyncClient, logger: LoggerA
         logger.error(f"Failed to get video bytes from {video_path}, status code: {video.status_code}")
         raise MumbleException(f"Failed to get video bytes from {video_path}")
     
-    logger.info(f"Successfully retrieved video bytes from {video_path}")
-    logger.info(f"videos list response: {short_list.text}, with status code {short_list.status_code}, and url {short_list.url}")
+    #logger.info(f"Successfully retrieved video bytes from {video_path}")
+    #logger.info(f"videos list response: {short_list.text}, with status code {short_list.status_code}, and url {short_list.url}")
     return video.content
 
 def get_short_to_exploit(shorts, short_title, logger):
     for short in shorts:
         if short.get("name") == short_title:
-            logger.info(f"Found short with title {short_title}")
+            #logger.info(f"Found short with title {short_title}")
             return short
     raise MumbleException(f"Short with title {short_title} not found in response")
     
@@ -344,7 +336,7 @@ async def getflag_video(
     logger.debug(f"getflag(0) for the user {username} and video {title} flag should be {description}")
     await login(client, username, password,logger)
 
-    logger.info(f"try to access flag in /app/myprofile")
+    #logger.info(f"try to access flag in /app/myprofile")
     response = await client.get("/get_my_videos")
     logger.debug("response.text is: " + response.text)
     assert_in(task.flag, response.text, "Flag missing")
@@ -378,7 +370,7 @@ async def putflag_short(
     await upload_short(client, logger, short_title, description, subtitles, translate_to_spanish)
 
     await db.set("userdata2", (username, password, short_title))
-    logger.info(f"User data saved for {username}, and uploaded successfully")
+    #logger.info(f"User data saved for {username}, and uploaded successfully")
     
     return short_title
 
@@ -394,7 +386,7 @@ async def getflag_short(
     logger.debug(f"getflag(1) for the user {username} and short {short_title} flag should be {task.flag}")
     await login(client, username, password,logger)
     
-    logger.info(f"try to access flag in /app/get_shorts")
+    #logger.info(f"try to access flag in /app/get_shorts")
     response = await client.get("/get_shorts")
     try:
         json = response.json()
@@ -406,9 +398,9 @@ async def getflag_short(
     
     # Check if the short with the title exists
     for short in json:
-        #logger.info(f"Checking short: {short.get('title')}")
+        ##logger.info(f"Checking short: {short.get('title')}")
         if short.get("name") == short_title:
-            logger.info(f"Found short with title {short_title}")
+            #logger.info(f"Found short with title {short_title}")
             assert_in(task.flag, short.get("original_captions"), "Flag missing")
             return
     
@@ -441,7 +433,7 @@ async def putnoise_video(task: PutnoiseCheckerTaskMessage, db: ChainDB, logger: 
 
 @checker.getnoise(0)
 async def getnoise_video(task: GetnoiseCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, client: AsyncClient):
-    logger.info(f"Getnoise 0 (video) {client.base_url}")
+    #logger.info(f"Getnoise 0 (video) {client.base_url}")
     try:
         username, password, title, description = await db.get('information')
     except:
@@ -482,7 +474,7 @@ async def putnoise_profile_description(task: PutnoiseCheckerTaskMessage, db: Cha
 
 @checker.getnoise(1)
 async def getnoise_profile_description(task: GetnoiseCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, client: AsyncClient):
-    logger.info(f"Getnoise 1 (description) {client.base_url}")
+    #logger.info(f"Getnoise 1 (description) {client.base_url}")
     try:
         username, password, about = await db.get('information1')
     except:
@@ -496,13 +488,13 @@ async def getnoise_profile_description(task: GetnoiseCheckerTaskMessage, db: Cha
         raise MumbleException()
     
     json = response.json()
-    logger.info(f"Json Response about is {json} {response}")
+    #logger.info(f"Json Response about is {json} {response}")
     about_in_response = json.get("about")
     
     if about_in_response != about.get("about"):
         raise MumbleException(f"About in profile and about that was saved are different {about} != {about_in_response}")
     
-    logger.info("getnoise(1) (description) worked fine")
+    #logger.info("getnoise(1) (description) worked fine")
     
     
 @checker.putnoise(2)
@@ -530,7 +522,7 @@ async def putnoise_short_description(task: PutnoiseCheckerTaskMessage, db: Chain
 
 @checker.getnoise(2)
 async def getnoise_short_description(task: GetnoiseCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, client: AsyncClient):
-    logger.info(f"Getnoise 2 (short description) {client.base_url}")
+    #logger.info(f"Getnoise 2 (short description) {client.base_url}")
     try:
         username, password, short_title, description = await db.get('information3')
     except:
@@ -550,7 +542,7 @@ async def getnoise_short_description(task: GetnoiseCheckerTaskMessage, db: Chain
     
     for short in json:
         if short.get("name") == short_title:
-            logger.info(f"Found short with title {short_title}")
+            #logger.info(f"Found short with title {short_title}")
             assert_in(description, short.get("description"), "Description is wrong or missing")
             return
     
@@ -569,31 +561,31 @@ async def havoc_failed_login(task: HavocCheckerTaskMessage, logger: LoggerAdapte
     try:
         failed_login = await login(client, username, password, logger)
     except MumbleException as e:
-        logger.info(f"Failed login for user {username} with password {password} raised MumbleException: {e} like expected")
+        #logger.info(f"Failed login for user {username} with password {password} raised MumbleException: {e} like expected")
         return
     
     raise MumbleException(f"Failed to get unauthorized response for user {username} with password {password}")
     
-    logger.info(f"havoc(0) FAILED login worked fine for user {username} with password {password}")
+    #logger.info(f"havoc(0) FAILED login worked fine for user {username} with password {password}")
 
 @checker.havoc(1)
 async def havoc_get_logo(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
-    logger.info("havoc(1) get logo")
+    #logger.info("havoc(1) get logo")
     response = await client.get("/assets/ParcerroTV.svg")
     if response.status_code != 200:
         raise MumbleException(f"Failed to get ParceroTV svg logo, status code: {response.status_code}")
     
-    logger.info("havoc(1) get logo worked fine")
+    #logger.info("havoc(1) get logo worked fine")
     assert_in("<svg", response.text, "Logo SVG not found in response")
 
 @checker.havoc(2)
 async def havoc_get_playlist(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
-    logger.info("havoc(2) get playlist")
+    #logger.info("havoc(2) get playlist")
     pass
 
 @checker.havoc(3)
 async def havoc_get_correct_vtt(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
-    logger.info("havoc(3) get correct vtt")
+    #logger.info("havoc(3) get correct vtt")
     username: str = "".join(
         random.choices(string.ascii_uppercase + string.digits, k=12)
     )
@@ -612,7 +604,7 @@ async def havoc_get_correct_vtt(task: HavocCheckerTaskMessage, logger: LoggerAda
     
     response = await client.get("/get_shorts")
     json = response.json()
-    logger.info(f"Shorts response: {json}")
+    #logger.info(f"Shorts response: {json}")
     
     for short in json:
         if short.get("name") == short_title:
@@ -620,14 +612,14 @@ async def havoc_get_correct_vtt(task: HavocCheckerTaskMessage, logger: LoggerAda
             captions = await client.get(caption_path)
             if captions.status_code != 200:
                 raise MumbleException(f"Failed to get captions for the short {short_title}, status code: {captions.status_code}")
-            logger.info(f"Captions for the short {short_title} are {captions.text}")
+            #logger.info(f"Captions for the short {short_title} are {captions.text}")
             assert_in("Que chimba sog que chimba", ' '.join(extract_vtt_words(captions.text)), "Captions not found in response")
             return
     raise MumbleException(f"Short with title {short_title} not found in response, cannot get captions")
 
 @checker.havoc(4)
 async def havoc_same_text_same_translation(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
-    logger.info("havoc(4) same text same translation")
+    # #logger.info("havoc(4) same text same translation")
     username: str = "".join(
         random.choices(string.ascii_uppercase + string.digits, k=12)
     )
@@ -650,7 +642,7 @@ async def havoc_same_text_same_translation(task: HavocCheckerTaskMessage, logger
     
     response = await client.get("/get_shorts")
     json = response.json()
-    logger.info(f"Shorts response: {json}")
+    #logger.info(f"Shorts response: {json}")
     for short in json:
         if short.get("name") == short_title:
             caption_path = short.get("caption_path")
@@ -667,9 +659,9 @@ async def havoc_same_text_same_translation(task: HavocCheckerTaskMessage, logger
     if captions.text != captions2.text:
         raise MumbleException(f"Captions(vtt) for the shorts {short_title}: {captions.text} and {short_title2}: {captions2.text} are different, but they should be the same")
 
-@checker.havoc(5)
+
 async def havoc_vtt_words_in_translation_array(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
-    logger.info("havoc(5) vtt words in translation array")
+    #logger.info("havoc(5) vtt words in translation array")
     username: str = "".join(
         random.choices(string.ascii_uppercase + string.digits, k=12)
     )
@@ -690,7 +682,7 @@ async def havoc_vtt_words_in_translation_array(task: HavocCheckerTaskMessage, lo
     
     response = await client.get("/get_shorts")
     json = response.json()
-    logger.info(f"Shorts response: {json}")
+    #logger.info(f"Shorts response: {json}")
     
     with open("spanish_words.txt", encoding="utf-8") as f:
         raw = f.read()
@@ -702,14 +694,14 @@ async def havoc_vtt_words_in_translation_array(task: HavocCheckerTaskMessage, lo
             captions = await client.get(caption_path)
             if captions.status_code != 200:
                 raise MumbleException(f"Failed to get captions for the short {short_title}, status code: {captions.status_code}")
-            logger.info(f"Captions for the short {short_title} are {captions.text}")
+            #logger.info(f"Captions for the short {short_title} are {captions.text}")
             vtt_words = extract_vtt_words(captions.text)
             
     for word in vtt_words:
         assert_in(word, wordlist, f"Word '{word}' from VTT not found in translation array")
 
 
-@checker.havoc(6)
+@checker.havoc(5)
 async def havoc_get_vtt_index(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
     username_attacker: str = "".join(
         random.choices(string.ascii_uppercase + string.digits, k=12)
@@ -724,12 +716,12 @@ async def havoc_get_vtt_index(task: HavocCheckerTaskMessage, logger: LoggerAdapt
     vtts = await client.get("/vtt")
     if vtts.status_code != 200:
         raise MumbleException("Failed to get VTTs")
-    logger.info(f"VTTs response: {vtts.text}")
+    #logger.info(f"VTTs response: {vtts.text}")
     assert_in("vtt", vtts.text, "VTTs not found in response")
     
-@checker.havoc(7)
+@checker.havoc(6)
 async def havoc_diffent_text_different_translation(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
-    logger.info("havoc(7) different text different translation")
+    #logger.info("havoc(7) different text different translation")
     username: str = "".join(
         random.choices(string.ascii_uppercase + string.digits, k=12)
     )
@@ -755,7 +747,7 @@ async def havoc_diffent_text_different_translation(task: HavocCheckerTaskMessage
     
     response = await client.get("/get_shorts")
     json = response.json()
-    logger.info(f"Shorts response: {json}")
+    #logger.info(f"Shorts response: {json}")
     for short in json:
         if short.get("name") == short_title:
             caption_path = short.get("caption_path")
@@ -772,13 +764,13 @@ async def havoc_diffent_text_different_translation(task: HavocCheckerTaskMessage
     if captions.text == captions2.text:
         raise MumbleException(f"Captions(vtt) for the shorts {short_title}: {captions.text} and {short_title2}: {captions2.text} are the same, but they should be different")
 
-    logger.info(f"havoc(7) different text different translation worked fine for shorts {short_title} and {short_title2}")
+    #logger.info(f"havoc(7) different text different translation worked fine for shorts {short_title} and {short_title2}")
 
 
 
-@checker.havoc(8)
+@checker.havoc(7)
 async def havoc_get_different_static_html_files(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
-    logger.info("havoc(8) get different static html files")
+    #logger.info("havoc(8) get different static html files")
     # List of static HTML files to check
     static_files = [
         "/login",
@@ -798,7 +790,7 @@ async def havoc_get_different_static_html_files(task: HavocCheckerTaskMessage, l
         response = await client.get(file)
         if response.status_code != 200:
             raise MumbleException(f"Failed to get static file {file}, status code: {response.status_code}")
-    logger.info("havoc(8) get different static html files worked fine")
+    #logger.info("havoc(8) get different static html files worked fine")
 
 """
 EXPLOIT FUNCTIONS
@@ -817,15 +809,15 @@ async def exploit_video(task: ExploitCheckerTaskMessage, searcher: FlagSearcher,
     await login(client, username_attacker, password_attacker, logger)
     
     
-    logger.info(f"Exploiting {task.attack_info} ")
+    #logger.info(f"Exploiting {task.attack_info} ")
     username = task.attack_info
     response = await client.get(f"/get_user_info_with_name/{username}")
     if response.status_code != 200:
         raise MumbleException()
     json = response.json()
-    logger.info(f"json is {json}")
+    #logger.info(f"json is {json}")
     id = json.get("id")
-    logger.info(f"/get_private_videos/{id}")
+    #logger.info(f"/get_private_videos/{id}")
     private_video_response = await client.get(f"/get_private_videos/{id}")
     videos = private_video_response.json()
     video = videos[0]
@@ -839,19 +831,19 @@ async def exploit_video(task: ExploitCheckerTaskMessage, searcher: FlagSearcher,
     if my_vid_response.status_code != 200:
         raise MumbleException()
     videos = my_vid_response.json()
-    logger.info(f"Videos are {videos}")
+    #logger.info(f"Videos are {videos}")
     for video in videos:
-        logger.info(f"video {video}")
+        #logger.info(f"video {video}")
         if video.get("name") == title:
             video_path = video.get("path")
             break
     
-    logger.info(f"/get_video_info/{video_path}")
+    #logger.info(f"/get_video_info/{video_path}")
     video_response = await client.get(f"/get_video_info/{video_path}")
     if video_response.status_code != 200:
         raise MumbleException()
     video_exploited = video_response.json()
-    logger.info(f"Exploited video json: {video_exploited}")
+    #logger.info(f"Exploited video json: {video_exploited}")
     if flag := searcher.search_flag(video_exploited.get("description")):
         return flag
     raise MumbleException("flag not found")
@@ -870,7 +862,7 @@ async def exploit_short(task: ExploitCheckerTaskMessage, searcher: FlagSearcher,
     await signup(client, username_attacker, password_attacker, logger)
     await login(client, username_attacker, password_attacker, logger)
     
-    logger.info(f"Exploiting {task.attack_info} variant {task.variant_id} task {task}")
+    #logger.info(f"Exploiting {task.attack_info} variant {task.variant_id} task {task}")
     short_title = task.attack_info
     response = await client.get(f"/get_shorts")
     if response.status_code != 200:
@@ -886,20 +878,20 @@ async def exploit_short(task: ExploitCheckerTaskMessage, searcher: FlagSearcher,
     video_bytes = await get_video_bytes_from_short(short_to_exploit, client, logger)
     duration = get_duration_from_bytes(video_bytes)
     duration_two_decimal = round(duration, 2)
-    logger.info(f"Duration of the video title {short_title} is {duration_two_decimal} seconds")
+    #logger.info(f"Duration of the video title {short_title} is {duration_two_decimal} seconds")
     caption_path = short_to_exploit.get("caption_path")
     captions = await client.get(caption_path)
     vtts = await client.get("/vtt")
     captions_vtt = captions.text
     vtts_vtt = vtts.text
-    logger.info(f"Captions for the short {short_title} are {captions_vtt} from the path {caption_path} with response {captions}, url is {captions.url}")
-    logger.info(f"VTTs for the short {short_title} are {vtts_vtt} from the path {vtts.url}")
+    #logger.info(f"Captions for the short {short_title} are {captions_vtt} from the path {caption_path} with response {captions}, url is {captions.url}")
+    #logger.info(f"VTTs for the short {short_title} are {vtts_vtt} from the path {vtts.url}")
 
     flag = full_exploit_for_shorts(duration_two_decimal, captions_vtt)
-    logger.info(f"Flag for short {short_title} is {flag}")
+    #logger.info(f"Flag for short {short_title} is {flag}")
     
     if flag := searcher.search_flag(flag):
-        logger.info(f"Flag found: {flag}")
+        #logger.info(f"Flag found: {flag}")
         return flag
     else:
         logger.error("Flag not found in the exploited short")
