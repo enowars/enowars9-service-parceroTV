@@ -12,7 +12,7 @@ from bs4 import BeautifulSoup
 import subprocess
 import tempfile
 from pathlib import Path
-from exploit_translation import full_exploit_for_shorts, extract_vtt_words
+from exploit_translation import full_exploit_for_shorts, extract_vtt_words, create_word_arr
 
 from typing import Optional
 from logging import LoggerAdapter
@@ -663,8 +663,46 @@ async def havoc_same_text_same_translation(task: HavocCheckerTaskMessage, logger
         raise MumbleException(f"Captions(vtt) for the shorts {short_title}: {captions.text} and {short_title2}: {captions2.text} are different, but they should be the same")
 
 @checker.havoc(5)
-async def havoc_words_in_translation_array(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
-    pass
+async def havoc_vtt_words_in_translation_array(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
+    logger.info("havoc(5) vtt words in translation array")
+    username: str = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+    password: str = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+    
+    await signup(client, username, password, logger)
+    await login(client, username, password, logger)
+    
+    short_title = generate_short_title()
+    description = generate_short_description()
+    subtitles = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+    translate_to_spanish = True
+    await upload_short(client, logger, short_title, description, subtitles, translate_to_spanish)
+    
+    response = await client.get("/get_shorts")
+    json = response.json()
+    logger.info(f"Shorts response: {json}")
+    
+    with open("spanish_words.txt", encoding="utf-8") as f:
+        raw = f.read()
+    wordlist = create_word_arr(raw)
+    
+    for short in json:
+        if short.get("name") == short_title:
+            caption_path = short.get("caption_path")
+            captions = await client.get(caption_path)
+            if captions.status_code != 200:
+                raise MumbleException(f"Failed to get captions for the short {short_title}, status code: {captions.status_code}")
+            logger.info(f"Captions for the short {short_title} are {captions.text}")
+            vtt_words = extract_vtt_words(captions.text)
+            
+    for word in vtt_words:
+        assert_in(word, wordlist, f"Word '{word}' from VTT not found in translation array")
+    
 
 @checker.havoc(6)
 async def havoc_get_vtt_index(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
@@ -730,6 +768,36 @@ async def havoc_diffent_text_different_translation(task: HavocCheckerTaskMessage
         raise MumbleException(f"Captions(vtt) for the shorts {short_title}: {captions.text} and {short_title2}: {captions2.text} are the same, but they should be different")
 
     logger.info(f"havoc(7) different text different translation worked fine for shorts {short_title} and {short_title2}")
+
+
+
+@checker.havoc(8)
+async def havoc_get_different_static_html_files(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
+    logger.info("havoc(8) get different static html files")
+    # List of static HTML files to check
+    static_files = [
+        "/login",
+        "/register",
+        "/header",
+        "/footer",
+        "/aboutus",
+        "/help",
+        "/privacy",
+        "/terms",
+        "/developers",
+        "/jobs",
+        "/uploads_error",
+        "/unauthorized"
+    ]
+    for file in static_files:
+        response = await client.get(file)
+        if response.status_code != 200:
+            raise MumbleException(f"Failed to get static file {file}, status code: {response.status_code}")
+    logger.info("havoc(8) get different static html files worked fine")
+
+"""
+EXPLOIT FUNCTIONS
+"""
 
 @checker.exploit(0)
 async def exploit_video(task: ExploitCheckerTaskMessage, searcher: FlagSearcher, client: AsyncClient, logger:LoggerAdapter) -> Optional[str]:

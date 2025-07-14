@@ -668,7 +668,7 @@ async fn main() -> std::io::Result<()> {
             .service(static_page!("/header", "header.html"))
             .service(static_page!("/footer", "footer.html"))
             .service(static_page!("/register", "register.html"))
-            .service(static_page!("/aboutus", "about.html"))
+            .service(static_page!("/aboutus", "aboutus.html"))
             .service(static_page!("/help", "help.html"))
             .service(static_page!("/developers", "developers.html"))
             .service(static_page!("/terms", "terms.html"))
