@@ -29,8 +29,8 @@ services:
     volumes:
       - ./data:/data/db
     environment:
-      - MONGO_INITDB_ROOT_USERNAME=parcerotv
-      - MONGO_INITDB_ROOT_PASSWORD=parcerotv
+      MONGO_INITDB_ROOT_USERNAME: parcerotv
+      MONGO_INITDB_ROOT_PASSWORD: parcerotv
     mem_limit: 1G
     memswap_limit: 2G
     ulimits:

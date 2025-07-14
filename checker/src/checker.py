@@ -234,11 +234,13 @@ def get_duration_from_bytes(video_bytes):
         )
         return float(result.stdout)
 
-async def upload_short(client: AsyncClient, logger, short_title, description, subtitles, translate_to_spanish):
+async def upload_short(client: AsyncClient, logger, short_title, description, subtitles, translate_to_spanish, upload_same_video = False) -> str:
     """Upload a short video with the given title, description, subtitles and translation option."""
     logger.info(f"Uploading short video with title: {short_title}, description: {description}, subtitles: {subtitles}, translate_to_spanish: {translate_to_spanish}")
-    
-    with open(get_random_video_path(), "rb") as video_file:
+    video_path = get_random_video_path()
+    if upload_same_video:
+        video_path = os.path.join("videos", "bugs.mp4")
+    with open(video_path, "rb") as video_file:
         duration = get_duration(video_file.name)
         duration = round(duration, 2)  # Round to 2 decimal places Like in Client javascript
         logger.info(f"Video duration: {duration} seconds, {video_file.name}")
@@ -638,8 +640,8 @@ async def havoc_same_text_same_translation(task: HavocCheckerTaskMessage, logger
         random.choices(string.ascii_uppercase + string.digits, k=12)
     )
     translate_to_spanish = True
-    await upload_short(client, logger, short_title, description, subtitles, translate_to_spanish)
-    await upload_short(client, logger, short_title2, description, subtitles, translate_to_spanish)
+    await upload_short(client, logger, short_title, description, subtitles, translate_to_spanish, upload_same_video=True)
+    await upload_short(client, logger, short_title2, description, subtitles, translate_to_spanish, upload_same_video=True)
     
     response = await client.get("/get_shorts")
     json = response.json()
@@ -658,7 +660,7 @@ async def havoc_same_text_same_translation(task: HavocCheckerTaskMessage, logger
                 raise MumbleException(f"Failed to get captions for the short {short_title2}, status code: {captions2.status_code}")
     
     if captions.text != captions2.text:
-        raise MumbleException(f"Captions(vtt) for the shorts {short_title} and {short_title2} are different, but they should be the same")
+        raise MumbleException(f"Captions(vtt) for the shorts {short_title}: {captions.text} and {short_title2}: {captions2.text} are different, but they should be the same")
 
 @checker.havoc(5)
 async def havoc_words_in_translation_array(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
@@ -681,6 +683,53 @@ async def havoc_get_vtt_index(task: HavocCheckerTaskMessage, logger: LoggerAdapt
         raise MumbleException("Failed to get VTTs")
     logger.info(f"VTTs response: {vtts.text}")
     assert_in("vtt", vtts.text, "VTTs not found in response")
+    
+@checker.havoc(7)
+async def havoc_diffent_text_different_translation(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
+    logger.info("havoc(7) different text different translation")
+    username: str = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+    password: str = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+    
+    await signup(client, username, password, logger)
+    await login(client, username, password, logger)
+    
+    short_title = generate_short_title()
+    short_title2 = generate_short_title()  # Generate a different title for the second short
+    description = generate_short_description()
+    subtitles = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+    subtitles2 = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+    translate_to_spanish = True
+    await upload_short(client, logger, short_title, description, subtitles, translate_to_spanish, upload_same_video=True)
+    await upload_short(client, logger, short_title2, description, subtitles2, translate_to_spanish, upload_same_video=True)
+    
+    response = await client.get("/get_shorts")
+    json = response.json()
+    logger.info(f"Shorts response: {json}")
+    for short in json:
+        if short.get("name") == short_title:
+            caption_path = short.get("caption_path")
+            captions = await client.get(caption_path)
+            if captions.status_code != 200:
+                raise MumbleException(f"Failed to get captions for the short {short_title}, status code: {captions.status_code}")
+            
+        if short.get("name") == short_title2:
+            caption_path2 = short.get("caption_path")
+            captions2 = await client.get(caption_path2)
+            if captions2.status_code != 200:
+                raise MumbleException(f"Failed to get captions for the short {short_title2}, status code: {captions2.status_code}")
+    
+    if captions.text == captions2.text:
+        raise MumbleException(f"Captions(vtt) for the shorts {short_title}: {captions.text} and {short_title2}: {captions2.text} are the same, but they should be different")
+
+    logger.info(f"havoc(7) different text different translation worked fine for shorts {short_title} and {short_title2}")
 
 @checker.exploit(0)
 async def exploit_video(task: ExploitCheckerTaskMessage, searcher: FlagSearcher, client: AsyncClient, logger:LoggerAdapter) -> Optional[str]:
