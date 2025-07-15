@@ -12,7 +12,7 @@ services:
       - MONGO_PORT=27017
       - MONGO_USER=parcerotv
       - MONGO_PASSWORD=parcerotv
-    mem_limit: 2G
+    mem_limit: 3G
     memswap_limit: 4G
     ulimits:
       core:
@@ -21,6 +21,7 @@ services:
       nproc:
         soft: 4000
         hard: 4000
+    restart: unless-stopped
 
   parcerotv-mongo:
     image: mongo
@@ -40,3 +41,4 @@ services:
       nproc:
         soft: 4000
         hard: 4000
+    restart: unless-stopped
