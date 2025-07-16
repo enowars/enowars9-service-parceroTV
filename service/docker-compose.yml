@@ -5,6 +5,7 @@ services:
     # Mount the data folder writable, so that information can be persisted across restarts.
     environment:
       - DATABASE_PATH=/service/data/parcerotv.db
+      - SESSION_SECRET=${SESSION_SECRET}
     volumes:
       - ./data/:/service/data:rw
     # Define the port mapping (external:internal port)

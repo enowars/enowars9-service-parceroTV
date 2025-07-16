@@ -17,7 +17,8 @@ RUN apt-get update && apt-get install -y \
     libavdevice-dev \
     libswscale-dev \
     libavresample-dev \
-    sqlite3 
+    sqlite3 \
+    openssl
 
 
 # Copy our entrypoint.sh and make it executable

@@ -299,6 +299,13 @@ async fn create_short(
     }
 }
 
+// #[post("/create_playlist_public")]
+// #[post("/create_playlist_private")]
+// #[post("/add_videos_to_playlist")]
+// #[post("/remove_video_from_playlist")]
+// #[post("/add_user_to_private_playlist")]
+// #[get("/get_playlists")] //Limit to 10
+// #[get("/get_playlist/{id}")]
 #[post("/post_comment")]
 async fn post_comment(
     pool: web::Data<Pool>,
@@ -639,7 +646,12 @@ async fn update_about(
 }
 
 fn session_middleware() -> SessionMiddleware<CookieSessionStore> {
-    SessionMiddleware::builder(CookieSessionStore::default(), Key::from(&[0; 64]))
+    let key = Key::from(
+        &std::env::var("SESSION_SECRET")
+            .expect("SESSION_SECRET must be set")
+            .as_bytes(),
+    );
+    SessionMiddleware::builder(CookieSessionStore::default(), key)
         .cookie_name(String::from("session"))
         .cookie_secure(false)
         .session_lifecycle(
@@ -648,6 +660,7 @@ fn session_middleware() -> SessionMiddleware<CookieSessionStore> {
         .cookie_same_site(SameSite::Strict)
         .cookie_content_security(CookieContentSecurity::Private)
         .cookie_http_only(true)
+        .cookie_secure(false)
         .build()
 }
 
@@ -667,7 +680,7 @@ async fn main() -> std::io::Result<()> {
         .with_flags(
             OpenFlags::SQLITE_OPEN_READ_WRITE
                 | OpenFlags::SQLITE_OPEN_CREATE
-                | OpenFlags::SQLITE_OPEN_NO_MUTEX, // optional but safe for threads
+                | OpenFlags::SQLITE_OPEN_NO_MUTEX,
         )
         .with_init(|conn| {
             conn.execute_batch(
