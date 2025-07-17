@@ -658,6 +658,7 @@ async def putnoise_create_playlist_public(task: PutnoiseCheckerTaskMessage, db: 
     video_res = await client.get("/api/fetch_all_videos")
     video_ids = [video.get("id") for video in video_res.json()]
     sample_video_ids = random.sample(video_ids, min(3, len(video_ids)))
+
     
     response = await client.post("/app/create_playlist", data={
         "name": playlist_name,
@@ -698,6 +699,117 @@ async def getnoise_create_playlist_public(task: GetnoiseCheckerTaskMessage, db: 
             return
     raise MumbleException(f"Public playlist was not retrievable")
 
+@checker.putnoise(5)
+async def putnoise_different_text_different_translation(task: PutnoiseCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, client: AsyncClient):
+    username: str = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+    password: str = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+    
+    await signup(client, username, password, logger)
+    await login(client, username, password, logger)
+    
+    short_title = generate_short_title()
+    short_title2 = generate_short_title()  # Generate a different title for the second short
+    description = generate_short_description()
+    subtitles = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+    subtitles2 = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+    translate_to_spanish = True
+    await upload_short(client, logger, short_title, description, subtitles, translate_to_spanish, upload_same_video=True)
+    await upload_short(client, logger, short_title2, description, subtitles2, translate_to_spanish, upload_same_video=True)
+    await db.set('information4', (username, password, short_title, short_title2, subtitles, subtitles2))
+
+@checker.getnoise(5)
+async def getnoise_different_text_different_translation(task: GetnoiseCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, client: AsyncClient):
+    #logger.info(f"Getnoise 5 (different text different translation) {client.base_url}")
+    try:
+        username, password, short_title, short_title2, subtitles, subtitles2 = await db.get('information4')
+    except KeyError:
+        logger.error("Putnoise 5 (different text different translation) failed : DB couldnt get information")
+        raise MumbleException('Putnoise(5) failed')
+    
+    await login(client, username, password, logger)
+    response = await client.get("/get_shorts")
+    json = response.json()
+    #logger.info(f"Shorts response: {json}")
+    for short in json:
+        if short.get("name") == short_title:
+            caption_path = short.get("caption_path")
+            captions = await client.get(caption_path)
+            if captions.status_code != 200:
+                raise MumbleException(f"Failed to get captions for the short {short_title}, status code: {captions.status_code}")
+            
+        if short.get("name") == short_title2:
+            caption_path2 = short.get("caption_path")
+            captions2 = await client.get(caption_path2)
+            if captions2.status_code != 200:
+                raise MumbleException(f"Failed to get captions for the short {short_title2}, status code: {captions2.status_code}")
+    
+    if captions.text == captions2.text:
+        raise MumbleException(f"Captions(vtt) for the shorts {short_title}: {captions.text} and {short_title2}: {captions2.text} are the same, but they should be different")
+
+
+@checker.putnoise(6)
+async def putnoise_same_text_same_translation(task: PutnoiseCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, client: AsyncClient):
+    # #logger.info("havoc(4) same text same translation")
+    username: str = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+    password: str = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+    
+    await signup(client, username, password, logger)
+    await login(client, username, password, logger)
+    
+    short_title = generate_short_title()
+    short_title2 = generate_short_title()  # Generate a different title for the second short
+    description = generate_short_description()
+    subtitles = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+    translate_to_spanish = True
+    await upload_short(client, logger, short_title, description, subtitles, translate_to_spanish, upload_same_video=True)
+    await upload_short(client, logger, short_title2, description, subtitles, translate_to_spanish, upload_same_video=True)
+    await db.set('information5', (username, password, short_title, short_title2, subtitles))
+    
+@checker.getnoise(6)
+async def getnoise_same_text_same_translation(task: GetnoiseCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, client: AsyncClient):
+    #logger.info(f"Getnoise 6 (same text same translation) {client.base_url}")
+    try:
+        username, password, short_title, short_title2, subtitles = await db.get('information5')
+    except KeyError:
+        logger.error("Putnoise 6 (same text same translation) failed : DB couldnt get information")
+        raise MumbleException('Putnoise(6) failed')
+    
+    await login(client, username, password, logger)
+    
+    response = await client.get("/get_shorts")
+    json = response.json()
+    #logger.info(f"Shorts response: {json}")
+    for short in json:
+        if short.get("name") == short_title:
+            caption_path = short.get("caption_path")
+            captions = await client.get(caption_path)
+            if captions.status_code != 200:
+                raise MumbleException(f"Failed to get captions for the short {short_title}, status code: {captions.status_code}")
+            
+        if short.get("name") == short_title2:
+            caption_path2 = short.get("caption_path")
+            captions2 = await client.get(caption_path2)
+            if captions2.status_code != 200:
+                raise MumbleException(f"Failed to get captions for the short {short_title2}, status code: {captions2.status_code}")
+    
+    if captions.text != captions2.text:
+        raise MumbleException(f"Translations (Caption): One text only has ONE translation")
+
+
 @checker.havoc(0)
 async def havoc_failed_login(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
     username: str = "".join(
@@ -728,7 +840,7 @@ async def havoc_get_logo(task: HavocCheckerTaskMessage, logger: LoggerAdapter, c
     assert_in("<svg", response.text, "Logo SVG not found in response")
 
 
-@checker.havoc(3)
+@checker.havoc(2)
 async def havoc_get_correct_vtt(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
     #logger.info("havoc(3) get correct vtt")
     username: str = "".join(
@@ -766,49 +878,8 @@ async def havoc_get_correct_vtt(task: HavocCheckerTaskMessage, logger: LoggerAda
             return
     raise MumbleException(f"Short with title {short_title} not found in response, cannot get captions")
 
-@checker.havoc(4)
-async def havoc_same_text_same_translation(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
-    # #logger.info("havoc(4) same text same translation")
-    username: str = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    password: str = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    
-    await signup(client, username, password, logger)
-    await login(client, username, password, logger)
-    
-    short_title = generate_short_title()
-    short_title2 = generate_short_title()  # Generate a different title for the second short
-    description = generate_short_description()
-    subtitles = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    translate_to_spanish = True
-    await upload_short(client, logger, short_title, description, subtitles, translate_to_spanish, upload_same_video=True)
-    await upload_short(client, logger, short_title2, description, subtitles, translate_to_spanish, upload_same_video=True)
-    
-    response = await client.get("/get_shorts")
-    json = response.json()
-    #logger.info(f"Shorts response: {json}")
-    for short in json:
-        if short.get("name") == short_title:
-            caption_path = short.get("caption_path")
-            captions = await client.get(caption_path)
-            if captions.status_code != 200:
-                raise MumbleException(f"Failed to get captions for the short {short_title}, status code: {captions.status_code}")
-            
-        if short.get("name") == short_title2:
-            caption_path2 = short.get("caption_path")
-            captions2 = await client.get(caption_path2)
-            if captions2.status_code != 200:
-                raise MumbleException(f"Failed to get captions for the short {short_title2}, status code: {captions2.status_code}")
-    
-    if captions.text != captions2.text:
-        raise MumbleException(f"Translations (Caption): One text only has ONE translation")
 
-
+#For performance this maybe should not be included as noise (we see on 19)
 async def havoc_vtt_words_in_translation_array(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
     #logger.info("havoc(5) vtt words in translation array")
     username: str = "".join(
@@ -850,7 +921,7 @@ async def havoc_vtt_words_in_translation_array(task: HavocCheckerTaskMessage, lo
         assert_in(word, wordlist, f"The word {word} isnt part of the spanish vocabulary")
 
 
-@checker.havoc(5)
+@checker.havoc(3)
 async def havoc_get_vtt_index(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
     username_attacker: str = "".join(
         random.choices(string.ascii_uppercase + string.digits, k=12)
@@ -868,56 +939,10 @@ async def havoc_get_vtt_index(task: HavocCheckerTaskMessage, logger: LoggerAdapt
     #logger.info(f"VTTs response: {vtts.text}")
     assert_in("vtt", vtts.text, "VTTs not found in response")
     
-@checker.havoc(6)
-async def havoc_diffent_text_different_translation(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
-    #logger.info("havoc(7) different text different translation")
-    username: str = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    password: str = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    
-    await signup(client, username, password, logger)
-    await login(client, username, password, logger)
-    
-    short_title = generate_short_title()
-    short_title2 = generate_short_title()  # Generate a different title for the second short
-    description = generate_short_description()
-    subtitles = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    subtitles2 = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    translate_to_spanish = True
-    await upload_short(client, logger, short_title, description, subtitles, translate_to_spanish, upload_same_video=True)
-    await upload_short(client, logger, short_title2, description, subtitles2, translate_to_spanish, upload_same_video=True)
-    
-    response = await client.get("/get_shorts")
-    json = response.json()
-    #logger.info(f"Shorts response: {json}")
-    for short in json:
-        if short.get("name") == short_title:
-            caption_path = short.get("caption_path")
-            captions = await client.get(caption_path)
-            if captions.status_code != 200:
-                raise MumbleException(f"Failed to get captions for the short {short_title}, status code: {captions.status_code}")
-            
-        if short.get("name") == short_title2:
-            caption_path2 = short.get("caption_path")
-            captions2 = await client.get(caption_path2)
-            if captions2.status_code != 200:
-                raise MumbleException(f"Failed to get captions for the short {short_title2}, status code: {captions2.status_code}")
-    
-    if captions.text == captions2.text:
-        raise MumbleException(f"Captions(vtt) for the shorts {short_title}: {captions.text} and {short_title2}: {captions2.text} are the same, but they should be different")
-
-    #logger.info(f"havoc(7) different text different translation worked fine for shorts {short_title} and {short_title2}")
 
 
 
-@checker.havoc(7)
+@checker.havoc(4)
 async def havoc_get_different_static_html_files(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
     #logger.info("havoc(8) get different static html files")
     # List of static HTML files to check
