@@ -37,6 +37,12 @@ app = lambda: checker.app
 
 
 """
+GLOBALS
+"""
+comida = ["Arepa", "Bandeja Paisa", "Bocadillo", "Chocoramo", "Empanada", "Lechona", "Mora", "Oblea", "Pandebono", "Patacón", "Postobón", "Sancocho", "Tinto", "Arequipe", "Bocadillo Veleño", "Chocoramo con Queso", "Empanada de Pino", "Lechona con Arepa", "Mora con Queso", "Oblea con Arequipe", "Pandebono con Queso", "Patacón con Hogao", "Postobón con Limón", "Sancocho de Gallina", "Tinto con Panela"]
+
+
+"""
 Utility functions
 """
 
@@ -48,7 +54,7 @@ async def signup(client: AsyncClient, username: str, password:str, logger):
     status_code = response.status_code
     #logger.info(f"Received status code {status_code} for signup process")
     if status_code in [303]:
-        #logger.info(f"user:{username} successfully registered with content to {response.text}")
+        logger.info(f"user:{username} successfully registered with content to {response.text}")
         ok = 1
     else:
         logger.error(f"Failed to sign up user, status_code: {status_code}")
@@ -62,11 +68,10 @@ async def login(client: AsyncClient, username:str, password: str, logger):
     #logger.info(f"Response of /checkcredentials with status: {response.status_code} and with content {response.text}")
     status_code = response.status_code
     if status_code in [303] and response.headers.get("Location") == "/app/home":
-        #logger.info(f"Successfull login of user {username} with redirection {status_code} ")
-        ok = 1
+        logger.info(f"Successfull login of user {username} with redirection {status_code} ")
     else:
         logger.error(f"Failed Login of user {username} status code: {status_code}, headers: {response.headers}")
-        raise MumbleException(f"Failed Login of user {username} with password: {password} should be Unauthozired {status_code}")
+        raise MumbleException(f"Failed Login of user {username}")
 
 def generate_title() -> str:
     adj = random.choice(adjectives)
@@ -83,7 +88,15 @@ def generate_description() -> str:
     return f"{random.choice(german_proverbs)} {random.randint(1, 10)}"
 
 def generate_about() -> str:
-    return "aasd"
+    return "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+
+def gererate_random_subtitles() -> str:
+    """Generate random subtitles for a short video."""
+    return " ".join(
+        random.choices(comida, k=random.randint(5, 15))
+    )
 
 def generate_short_title() -> str:
     """Generate a random title for a short video."""
@@ -166,15 +179,14 @@ async def upload_private_video(client: AsyncClient, description, location, title
    
    status_code = response.status_code
    if status_code == 404:
-        #logger.info(f"Client error {status_code} with {response.text}")
-       ok = 1
+       logger.info(f"Client error {status_code} with {response.text}")
    if status_code in [303]:
        #logger.info(f"Video was succesfully uploaded")
        redirect_url = response.headers.get("Location")
        #logger.info(f"Redirected to: {redirect_url}")
        return redirect_url 
    else:
-       raise MumbleException(f"failed to upload video {title}, with location: {location}")
+       raise MumbleException(f"failed to upload video {title}")
 
 
 async def upload_public_video(client: AsyncClient, logger, title, description):
@@ -189,14 +201,14 @@ async def upload_public_video(client: AsyncClient, logger, title, description):
         "file": (Path(video_path).name, video_file, "video/mp4"),
         "thumbnail": ("thumbnail.png", thumb, "image/png"),
     }
-        #logger.info(f"Uploading public video {video_path}")
+        logger.info(f"Uploading public video {video_path}")
         response = await client.post("/app/create_video", files=files)
     status_code = response.status_code
     if status_code == 404:
         #logger.info(f"Client error {status_code} with {response.text}")
         ok = 1
     if status_code in [303]:
-       #logger.info(f"Video was succesfully uploaded")
+       logger.info(f"Video was succesfully uploaded")
        redirect_url = response.headers.get("Location")
        #logger.info(f"Redirected to: {redirect_url}")
        return redirect_url 
@@ -262,7 +274,7 @@ async def upload_short(client: AsyncClient, logger, short_title, description, su
         #logger.info(f"Redirected to: {redirect_url}")
         return redirect_url
     else:
-        raise MumbleException(f"Failed to upload short video with title {short_title}, status code: {status_code}, and response: {response.text}.")
+        raise MumbleException(f"Failed to upload short video with title {short_title}, status code: {status_code}")
 
 async def get_video_bytes_from_short(short, client: AsyncClient, logger: LoggerAdapter) -> bytes:
     video_path = short.get("path")
@@ -597,14 +609,14 @@ async def havoc_get_correct_vtt(task: HavocCheckerTaskMessage, logger: LoggerAda
     
     short_title = generate_short_title()
     description = generate_short_description()
-    subtitles = "Que chimba sog que chimba"
+    subtitles = gererate_random_subtitles()
     translate_to_spanish = False
     
     await upload_short(client, logger, short_title, description, subtitles, translate_to_spanish)
     
     response = await client.get("/get_shorts")
     json = response.json()
-    #logger.info(f"Shorts response: {json}")
+    logger.info(f"Shorts response: {json}")
     
     for short in json:
         if short.get("name") == short_title:
@@ -612,8 +624,12 @@ async def havoc_get_correct_vtt(task: HavocCheckerTaskMessage, logger: LoggerAda
             captions = await client.get(caption_path)
             if captions.status_code != 200:
                 raise MumbleException(f"Failed to get captions for the short {short_title}, status code: {captions.status_code}")
-            #logger.info(f"Captions for the short {short_title} are {captions.text}")
-            assert_in("Que chimba sog que chimba", ' '.join(extract_vtt_words(captions.text)), "Captions not found in response")
+            logger.info(f"Captions for the short {short_title} are {captions.text}")
+            words = " ".join(extract_vtt_words(captions.text))
+            comida_arr = ' '.join(comida).split(" ")
+
+            for word in words.split(" "):
+                assert_in(word, comida_arr, f"Captions generation is not correct")
             return
     raise MumbleException(f"Short with title {short_title} not found in response, cannot get captions")
 
@@ -657,7 +673,7 @@ async def havoc_same_text_same_translation(task: HavocCheckerTaskMessage, logger
                 raise MumbleException(f"Failed to get captions for the short {short_title2}, status code: {captions2.status_code}")
     
     if captions.text != captions2.text:
-        raise MumbleException(f"Captions(vtt) for the shorts {short_title}: {captions.text} and {short_title2}: {captions2.text} are different, but they should be the same")
+        raise MumbleException(f"Translations (Caption): One text only has ONE translation")
 
 
 async def havoc_vtt_words_in_translation_array(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
@@ -698,7 +714,7 @@ async def havoc_vtt_words_in_translation_array(task: HavocCheckerTaskMessage, lo
             vtt_words = extract_vtt_words(captions.text)
             
     for word in vtt_words:
-        assert_in(word, wordlist, f"Word '{word}' from VTT not found in translation array")
+        assert_in(word, wordlist, f"The word {word} isnt part of the spanish vocabulary")
 
 
 @checker.havoc(5)
