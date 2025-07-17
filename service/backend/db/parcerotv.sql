@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS has_liked(
     UserID INTEGER NOT NULL,
     VideoID INTEGER NOT NULL,
     like_status INTEGER NOT NULL CHECK(like_status IN (0, 1)), -- 0 for dislike, 1 for like
+    created_at TEXT DEFAULT (datetime('now')),
     PRIMARY KEY (UserID, VideoID),
     FOREIGN KEY (UserID) REFERENCES users(UserID) ON DELETE CASCADE,
     FOREIGN KEY (VideoID) REFERENCES videos(VideoID) ON DELETE CASCADE
@@ -47,12 +48,14 @@ CREATE TABLE IF NOT EXISTS playlist(
     description TEXT NOT NULL CHECK(length(description) <= 2000),
     is_private INTEGER NOT NULL,
     owner_userID INTEGER NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY (owner_userID) REFERENCES users(UserID) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS access_rights_playlist(
     PlaylistID INTEGER NOT NULL,
     userID INTEGER NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
     PRIMARY KEY (PlaylistID, userID),
     FOREIGN KEY (playlistID) REFERENCES playlist(playlistID) ON DELETE CASCADE,
     FOREIGN KEY (userID) REFERENCES users(userID) ON DELETE CASCADE
@@ -61,6 +64,7 @@ CREATE TABLE IF NOT EXISTS access_rights_playlist(
 CREATE TABLE IF NOT EXISTS videos_in_playlist(
     PlaylistID INTEGER NOT NULL,
     videoID INTEGER NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
     PRIMARY KEY (PlaylistID, videoID),
     FOREIGN KEY (playlistID) REFERENCES playlist(playlistID) ON DELETE CASCADE,
     FOREIGN KEY (videoID) REFERENCES videos(videoID) ON DELETE CASCADE

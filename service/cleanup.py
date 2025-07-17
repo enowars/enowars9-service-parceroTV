@@ -27,11 +27,16 @@ while True:
     cursor = connection.cursor()
 
     cutoff_time = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=DELETE_TIMEINTEVALL)
+    
     cursor.execute("DELETE FROM users WHERE created_at < ?", (cutoff_time.strftime("%Y-%m-%d %H:%M:%S"), ))
     cursor.execute("DELETE FROM videos WHERE created_at < ?", (cutoff_time.strftime("%Y-%m-%d %H:%M:%S"), ))
     cursor.execute("DELETE FROM comments WHERE created_at < ?", (cutoff_time.strftime("%Y-%m-%d %H:%M:%S"), ))
     cursor.execute("DELETE FROM shorts WHERE created_at < ?", (cutoff_time.strftime("%Y-%m-%d %H:%M:%S"), ))
-
+    cursor.execute("DELETE FROM playlist WHERE created_at < ?", (cutoff_time.strftime("%Y-%m-%d %H:%M:%S"), ))
+    cursor.execute("DELETE FROM has_liked WHERE created_at < ?", (cutoff_time.strftime("%Y-%m-%d %H:%M:%S"), ))
+    cursor.execute("DELETE FROM access_rights_playlist WHERE created_at < ?", (cutoff_time.strftime("%Y-%m-%d %H:%M:%S"), ))
+    cursor.execute("DELETE FROM videos_in_playlist WHERE created_at < ?", (cutoff_time.strftime("%Y-%m-%d %H:%M:%S"), ))
+    
     #Delete Files in directory
     delete_old_files("/service/data/videos/", DELETE_TIMEINTEVALL)
     delete_old_files("/service/data/thumbnails/", DELETE_TIMEINTEVALL)

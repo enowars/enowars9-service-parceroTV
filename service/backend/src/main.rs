@@ -371,8 +371,6 @@ async fn create_playlist(
     let is_private = form.is_private;
     let video_ids: Vec<i32> = form.video_ids.clone();
     let user_ids: Vec<i32> = form.user_ids.clone();
-    println!("Creating playlist with name: {}, description: {}, is_private: {}, video_ids: {:?}, user_ids: {:?}", 
-        name, description, is_private, video_ids, user_ids);
     if let Ok(Some(user_id)) = session.get::<u32>("user_id") {
         let allowed = web::block({
             let pool      = pool.clone();
@@ -399,7 +397,6 @@ async fn create_playlist(
                     &user_id,
                     is_private,
                 )?;
-                println!("Playlist created successfully");
                 Ok(true)
             }
         })
@@ -410,7 +407,6 @@ async fn create_playlist(
         if allowed {
             Ok(redirect!("/app/playlist"))
         } else {
-            println!("User {} tried to create a playlist with private videos", user_id);
             Ok(redirect!("/no_permission"))
         }
     } else {
@@ -449,9 +445,31 @@ async fn get_videos_in_playlist(
     if let Ok(Some(user_id)) = session.get::<i32>("user_id") {
         let conn = get_db_conn(&pool).await?;
         let playlist_id = path.into_inner();
-        let videos_list: Vec<db::VideoInfo> = web::block(move || db::get_videos_in_playlist_db(&conn, &playlist_id))
-            .await?
-            .map_err(ErrorInternalServerError)?;
+        let has_access = web::block({
+            let pool = pool.clone();
+            let playlist_id = playlist_id;
+            let user_id = user_id;
+            move || {
+                let conn = pool.get()
+                    .map_err(|e| rusqlite::Error::SqliteFailure(
+                        rusqlite::ffi::Error::new(0),
+                        Some(format!("r2d2 error: {}", e))
+                    ))?;
+                db::user_can_access_playlist(&conn, &playlist_id, &user_id)
+            }
+        })
+        .await?
+        .map_err(ErrorInternalServerError)?;
+
+        if !has_access {
+            return Ok(HttpResponse::Forbidden().body("Access denied to this playlist."));
+        }
+
+        let videos_list: Vec<db::VideoInfo> =
+            web::block(move || db::get_videos_in_playlist_db(&conn, &playlist_id))
+                .await?
+                .map_err(ErrorInternalServerError)?;
+
         Ok(HttpResponse::Ok().json(videos_list))
     } else {
         Ok(redirect!("/"))

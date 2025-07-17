@@ -475,6 +475,23 @@ pub fn get_playlists_private_db(conn: &Connection, user_id: &u32) -> Result<Vec<
     Ok(playlists)
 }
 
+pub fn user_can_access_playlist(
+    conn: &Connection,
+    user_id: &i32,
+    playlist_id: &i32,
+) -> Result<bool> {
+    let result: Result<i32, rusqlite::Error> = conn.query_row(
+        "SELECT 1 FROM playlist where PlaylistID = ?1 AND (owner_userID = ?2 OR EXISTS (SELECT 1 FROM access_rights_playlist WHERE PlaylistID = ?1 AND UserID = ?2) OR is_private = 0)",
+        params![playlist_id, user_id],
+        |row| row.get(0),
+    );
+
+    match result {
+        Ok(count) => Ok(count > 0),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
+        Err(e) => Err(e),
+    }
+}
 
 pub fn check_videos_private(conn: &Connection, video_ids: &[i32]) -> Result<bool> {
     if video_ids.is_empty() {
@@ -500,7 +517,6 @@ pub fn check_videos_private(conn: &Connection, video_ids: &[i32]) -> Result<bool
         |row| row.get(0),
     )?;
 
-    println!("Count of private videos: {}", count);
     Ok(count > 0)
 }
 
@@ -532,7 +548,6 @@ pub fn create_playlist_db(
     }
 
     conn.execute(&sql_videos_in_playlist, params.as_slice())?;
-    println!("Successfully Insert vid in playlist");
 
      let placeholders_for_videos_in_playlist = std::iter::repeat("(?, ?)")
     .take(user_ids.len()).collect::<Vec<_>>().join(",");
@@ -544,7 +559,6 @@ pub fn create_playlist_db(
     }
 
     conn.execute(&sql_user_rights_in_playlist, params.as_slice())?;
-    println!("Successfully Inserted UserID");
     Ok(())
 }
 

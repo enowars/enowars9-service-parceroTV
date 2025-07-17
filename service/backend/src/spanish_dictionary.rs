@@ -34,7 +34,6 @@ pub static SPANISH_WORDS: Lazy<[&'static str; 4096]> = Lazy::new(|| {
             arr.push(word);
         }
     }
-    println!("arr {:?}", arr);
 
     assert!(arr.len() == 4096, "To translate to future spanish, the future words file must contain exactly 4096 unique words.");
     arr.try_into().expect("Vec length must be 4096")
