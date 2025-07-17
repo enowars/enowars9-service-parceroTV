@@ -455,7 +455,7 @@ async fn get_videos_in_playlist(
                         rusqlite::ffi::Error::new(0),
                         Some(format!("r2d2 error: {}", e))
                     ))?;
-                db::user_can_access_playlist(&conn, &playlist_id, &user_id)
+                db::user_can_access_playlist(&conn, &user_id,&playlist_id)
             }
         })
         .await?

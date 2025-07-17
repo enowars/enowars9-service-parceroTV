@@ -480,14 +480,14 @@ pub fn user_can_access_playlist(
     user_id: &i32,
     playlist_id: &i32,
 ) -> Result<bool> {
-    let result: Result<i32, rusqlite::Error> = conn.query_row(
-        "SELECT 1 FROM playlist where PlaylistID = ?1 AND (owner_userID = ?2 OR EXISTS (SELECT 1 FROM access_rights_playlist WHERE PlaylistID = ?1 AND UserID = ?2) OR is_private = 0)",
+    let result: Result<String, rusqlite::Error> = conn.query_row(
+        "SELECT name FROM playlist where PlaylistID = ?1 AND (owner_userID = ?2 OR EXISTS (SELECT 1 FROM access_rights_playlist WHERE PlaylistID = ?1 AND UserID = ?2) OR is_private = 0)",
         params![playlist_id, user_id],
         |row| row.get(0),
     );
-
+    
     match result {
-        Ok(count) => Ok(count > 0),
+        Ok(_) => Ok(true),
         Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
         Err(e) => Err(e),
     }
