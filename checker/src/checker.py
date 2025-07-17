@@ -79,6 +79,12 @@ def generate_title() -> str:
     number = random.randint(1, 1000000)
     return f"{adj}-{content}-{number}"
 
+def generate_playlist_name() -> str:
+    """Generate a random name for a playlist."""
+    adj = random.choice(adjectives)
+    number = random.randint(1, 1000000)
+    return f"{adj}-playlist-{number}"
+
 def generate_location() -> str:
     country = random.choice(countries)
     city = random.choice(cities)
@@ -561,6 +567,137 @@ async def getnoise_short_description(task: GetnoiseCheckerTaskMessage, db: Chain
     raise MumbleException(f"Short with title {short_title} not found in response")
 
 
+@checker.putnoise(3)
+async def putnoise_create_playlist_private(task: PutnoiseCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, client: AsyncClient):
+    username: str = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+    password: str = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+    
+    await signup(client, username, password, logger)
+    await login(client, username, password, logger)
+    logger.debug(f"Creating a playlist for user {username}")
+    playlist_name = generate_playlist_name()
+    playlist_description = generate_description()
+
+    user_res = await client.get("/get_all_users")
+    user_ids = [user.get("id") for user in user_res.json()]
+    one_user_id = user_ids[0] if user_ids else None
+    
+    video_res = await client.get("/api/fetch_all_videos")
+    video_ids = [video.get("id") for video in video_res.json()]
+    sample_video_ids = random.sample(video_ids, min(3, len(video_ids)))
+    
+    
+    
+    response = await client.post("/app/create_playlist", data={
+        "name": playlist_name,
+        "description": playlist_description,
+        "video_ids[]": sample_video_ids,
+        "user_ids[]": one_user_id,
+        "is_private": "true"
+    })
+    
+    status_code = response.status_code
+    if status_code != 303:
+        logger.error(f"Failed to create playlist, status code: {status_code}, response: {response.text}")
+        raise MumbleException(f"Failed to create playlist, status code: {status_code}")
+    
+    logger.debug(f"Playlist {playlist_name} created successfully")
+    await db.set('playlist_info', (username, password, playlist_name, playlist_description))
+
+
+@checker.getnoise(3)
+async def getnoise_create_playlist_private(task: GetnoiseCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, client: AsyncClient):
+    #logger.info(f"Getnoise 3 (create playlist) {client.base_url}")
+    try:
+        username, password, playlist_name, playlist_description = await db.get('playlist_info')
+    except KeyError:
+        logger.error("Putnoise 3 (create playlist) failed : DB couldnt get information")
+        raise MumbleException('Putnoise(3) failed')
+    
+    await login(client, username, password, logger
+)
+    response = await client.get("/get_playlists_private")
+    try:
+        json = response.json()
+    except ValueError:
+        logger.error("Failed to parse JSON response from /get_playlists_private")
+        raise MumbleException("Failed to get Playlist")
+    
+    for playlist in json:
+        if playlist.get("name") == playlist_name:
+            #logger.info(f"Found playlist with name {playlist_name}")
+            assert_in(playlist_description, playlist.get("description"), "Playlist description is wrong or missing")
+            return
+
+    raise MumbleException(f"Private playlist was not retrievable")
+
+@checker.putnoise(4)
+async def putnoise_create_playlist_public(task: PutnoiseCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, client: AsyncClient):
+    username: str = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+    password: str = "".join(
+        random.choices(string.ascii_uppercase + string.digits, k=12)
+    )
+    
+    await signup(client, username, password, logger)
+    await login(client, username, password, logger)
+    logger.debug(f"Creating a public playlist for user {username}")
+    playlist_name = generate_playlist_name()
+    playlist_description = generate_description()
+
+    user_res = await client.get("/get_all_users")
+    user_ids = [user.get("id") for user in user_res.json()]
+    one_user_id = user_ids[0] if user_ids else None
+    
+    
+    video_res = await client.get("/api/fetch_all_videos")
+    video_ids = [video.get("id") for video in video_res.json()]
+    sample_video_ids = random.sample(video_ids, min(3, len(video_ids)))
+    
+    response = await client.post("/app/create_playlist", data={
+        "name": playlist_name,
+        "description": playlist_description,
+        "video_ids[]": sample_video_ids,
+        "user_ids[]": one_user_id,
+        "is_private": "false"
+    })
+    
+    status_code = response.status_code
+    if status_code != 303:
+        logger.error(f"Failed to create public playlist, status code: {status_code}, response: {response.text}")
+        raise MumbleException(f"Failed to create public playlist, status code: {status_code}")
+    
+    logger.debug(f"Public Playlist {playlist_name} created successfully")
+    await db.set('public_playlist_info', (username, password, playlist_name, playlist_description))
+
+
+@checker.getnoise(4)
+async def getnoise_create_playlist_public(task: GetnoiseCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, client: AsyncClient):
+    try:
+        username, password, playlist_name, playlist_description = await db.get('public_playlist_info')
+    except KeyError:
+        logger.error("Putnoise 4 (create public playlist) failed : DB couldnt get information")
+        raise MumbleException('Putnoise(4) failed')
+    
+    await login(client, username, password, logger)
+    response = await client.get("/get_playlists_public")
+    try:
+        json = response.json()
+    except ValueError:
+        logger.error("Failed to parse JSON response from /get_playlists_public")
+        raise MumbleException("Failed to get Public Playlist")
+    
+    for playlist in json:
+        if playlist.get("name") == playlist_name:
+            #no more check because name isnt unique
+            return
+    raise MumbleException(f"Public playlist was not retrievable")
+
 @checker.havoc(0)
 async def havoc_failed_login(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
     username: str = "".join(
@@ -590,10 +727,6 @@ async def havoc_get_logo(task: HavocCheckerTaskMessage, logger: LoggerAdapter, c
     #logger.info("havoc(1) get logo worked fine")
     assert_in("<svg", response.text, "Logo SVG not found in response")
 
-@checker.havoc(2)
-async def havoc_get_playlist(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
-    #logger.info("havoc(2) get playlist")
-    pass
 
 @checker.havoc(3)
 async def havoc_get_correct_vtt(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
