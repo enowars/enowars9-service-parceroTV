@@ -7,6 +7,7 @@
     <title>Playlist</title>
     <link rel="stylesheet" href="/css/videos.css" />
     <link rel="stylesheet" href="/css/navigation.css" />
+    <link rel="stylesheet" href="/css/playlist.css" />
     <base href="/" />
     <script src="/js/playlist.js"></script>
 </head>
@@ -14,11 +15,55 @@
 <body>
     <div id="body" class="body">
         <div id="header" class="header"></div>
-         <div class="playlist-actions" style="padding: 1em;">
+        <div class="playlist-actions" style="padding: 1em;">
             <button id="createPlaylistBtn" class="create-playlist-button">Create Playlist</button>
         </div>
-        <div id="public_playlists" class="video-list"><header class="video-list-header">Public Playlist</header></div>
-        <div id="private_playlists" class="video-list"><header class="video-list-header">Private Private</header></div>
+
+        <div id="panel" class="panel hidden">
+            <form id="playlistCreateForm" action="/app/create_playlist" method="post">
+                <div>
+                    <label for="name">Name:</label><br />
+                    <input type="text" id="name" name="name" required />
+                </div>
+
+                <div>
+                    <label for="description">Description:</label><br />
+                    <textarea id="description" name="description" rows="3" required></textarea>
+                </div>
+                <p>Use crtl to select multiple!</p>
+                <p>You cant change the playlist later, nor add friend at a later point!</p>
+                <div>
+                    <label for="videos">Choose videos:</label><br />
+                    <select id="videos" name="video_ids[]" multiple size="5" required>
+                    </select>
+
+                </div>
+                <div>
+                    <label for="users">Share with users (only for private playlists):</label><br />
+                    <select id="users" name="user_ids[]" multiple size="5" required>
+                    </select>
+                </div>
+                
+
+                <div>
+                    <label>
+                        <input type="checkbox" name="is_private" value="true">
+                        Make playlist private
+                    </label>
+                </div>
+
+                <button type="submit">Create Playlist</button>
+                <button type="button" onclick="document.getElementById('panel').classList.add('hidden')">Close</button>
+            </form>
+
+
+        </div>
+        <div id="public_playlists" class="video-list">
+            <header class="video-list-header">Public Playlist</header>
+        </div>
+        <div id="private_playlists" class="video-list">
+            <header class="video-list-header">Private Playlist</header>
+        </div>
         <div id="footer" class="footer"></div>
     </div>
 </body>

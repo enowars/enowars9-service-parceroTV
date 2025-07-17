@@ -1,5 +1,10 @@
 use actix_multipart::form::{tempfile::TempFile, MultipartForm, text::Text};
 use serde::Deserialize;
+use serde::Serialize;
+use std::fmt;
+
+use serde_qs;
+
 
 #[derive(Deserialize)]
 pub struct FormInput {
@@ -51,3 +56,12 @@ pub struct ShortsForm{
 
 
 
+#[derive(Debug, Deserialize)]
+pub struct PlaylistForm {
+    pub name: String,
+    pub description: String,
+    pub video_ids: Vec<i32>,
+    pub user_ids: Vec<i32>,
+    #[serde(default)]
+    pub is_private: bool,
+}

@@ -6,6 +6,7 @@ use actix_multipart::MultipartError;
 use actix_multipart::form::MultipartForm;
 use actix_multipart::form::MultipartFormConfig;
 use actix_session::config::PersistentSession;
+use actix_web::error::ErrorBadRequest;
 use actix_web::HttpRequest;
 use actix_web::cookie::time::Duration;
 use actix_web::error::ErrorInternalServerError;
@@ -18,7 +19,7 @@ use backend::get_thumbnail_path;
 use backend::sanitize_title;
 use backend::save_thumbnail;
 use backend::save_video;
-
+use serde_qs::Config;
 use db::{
     create_comment, get_all_videos, increase_view_count_db, is_video_private,
     select_comments_by_video_id, select_my_videos, select_private_videos_by_userid, select_shorts,
@@ -28,6 +29,8 @@ use db::{
 };
 
 mod shorts_lib;
+use ffmpeg_next::codec::video;
+use serde::de;
 use shorts_lib::save_short;
 
 use forms::UpdateAboutForm;
@@ -45,6 +48,7 @@ use rusqlite::types::Null;
 
 use crate::db::get_like_status_db;
 use crate::db::insert_short;
+use crate::forms::PlaylistForm;
 use crate::forms::ShortsForm;
 use crate::shorts_lib::save_caption;
 
@@ -174,6 +178,11 @@ async fn playlist(session: Session) -> Result<impl Responder, Error> {
     serve_file_or_reject(session, "../frontend/playlist.html").await
 }
 
+#[get("/playlist_page")]
+async fn playlist_page(session: Session) -> Result<impl Responder, Error> {
+    serve_file_or_reject(session, "../frontend/playlist_page.html").await
+}
+
 #[get("/shorts")]
 async fn shorts(session: Session) -> Result<impl Responder, Error> {
     serve_file_or_reject(session, "../frontend/shorts.html").await
@@ -299,13 +308,156 @@ async fn create_short(
     }
 }
 
-// #[post("/create_playlist_public")]
-// #[post("/create_playlist_private")]
-// #[post("/add_videos_to_playlist")]
-// #[post("/remove_video_from_playlist")]
-// #[post("/add_user_to_private_playlist")]
-// #[get("/get_playlists")] //Limit to 10
-// #[get("/get_playlist/{id}")]
+#[get("/get_all_users")]
+async fn get_all_users(
+    pool: web::Data<Pool>,
+    session: Session,
+) -> Result<impl Responder, Error> {
+    if let Ok(Some(user_id)) = session.get::<u32>("user_id") {
+        let conn = get_db_conn(&pool).await?;
+        let users_50 = web::block(move || db::get_all_users_db(&conn))
+            .await?
+            .map_err(ErrorInternalServerError)?;
+        Ok(HttpResponse::Ok().json(users_50))
+    } else {
+        Ok(redirect!("/"))
+    }
+}
+
+#[get("/get_playlists_public")]
+async fn get_playlist_public(
+    session: Session,
+    pool: web::Data<Pool>,
+) -> Result<impl Responder, Error> {
+    if let Ok(Some(_user_id)) = session.get::<u32>("user_id") {
+        let conn = get_db_conn(&pool).await?;
+        let playlists = web::block(move || db::get_playlists_public_db(&conn))
+            .await?
+            .map_err(ErrorInternalServerError)?;
+        Ok(HttpResponse::Ok().json(playlists))
+    } else {
+        Ok(redirect!("/"))
+    }
+}
+
+#[get("/get_playlists_private")]
+async fn get_playlist_private(
+    session: Session,
+    pool: web::Data<Pool>,
+) -> Result<impl Responder, Error> {
+    if let Ok(Some(user_id)) = session.get::<u32>("user_id") {
+        let conn = get_db_conn(&pool).await?;
+        let playlists = web::block(move || db::get_playlists_private_db(&conn, &user_id))
+            .await?
+            .map_err(ErrorInternalServerError)?;
+        Ok(HttpResponse::Ok().json(playlists))
+    } else {
+        Ok(redirect!("/"))
+    }
+}
+
+#[post("/create_playlist")]
+async fn create_playlist(
+    session: Session,
+    pool: web::Data<Pool>,
+    req: HttpRequest,
+    body: String,
+) -> Result<impl Responder, Error> {
+    let config = Config::new(10, false);
+    let form: PlaylistForm = config.deserialize_str(&body)
+        .map_err(ErrorBadRequest)?;
+    let name = form.name.clone();
+    let description = form.description.clone();
+    let is_private = form.is_private;
+    let video_ids: Vec<i32> = form.video_ids.clone();
+    let user_ids: Vec<i32> = form.user_ids.clone();
+    println!("Creating playlist with name: {}, description: {}, is_private: {}, video_ids: {:?}, user_ids: {:?}", 
+        name, description, is_private, video_ids, user_ids);
+    if let Ok(Some(user_id)) = session.get::<u32>("user_id") {
+        let allowed = web::block({
+            let pool      = pool.clone();
+            let name      = name.clone();
+            let description = description.clone();
+            let vids      = video_ids.clone();
+            let uids      = user_ids.clone();
+            move || -> rusqlite::Result<bool> {
+                let conn = pool.get()
+                    .map_err(|e| rusqlite::Error::SqliteFailure(
+                        rusqlite::ffi::Error::new(0),
+                        Some(format!("r2d2 error: {}", e))
+                    ))?;
+
+                if db::check_videos_private(&conn, &vids)? {
+                    return Ok(false);
+                }
+                db::create_playlist_db(
+                    &conn,
+                    &name,
+                    &description,
+                    &vids,
+                    &uids,
+                    &user_id,
+                    is_private,
+                )?;
+                println!("Playlist created successfully");
+                Ok(true)
+            }
+        })
+        .await
+        .map_err(ErrorInternalServerError)?
+        .map_err(ErrorInternalServerError)?; 
+
+        if allowed {
+            Ok(redirect!("/app/playlist"))
+        } else {
+            println!("User {} tried to create a playlist with private videos", user_id);
+            Ok(redirect!("/no_permission"))
+        }
+    } else {
+        Ok(redirect!("/"))
+    }
+}
+
+
+
+
+
+#[get("/get_playlist/{id}")]
+async fn get_playlist(
+    session: Session,
+    pool: web::Data<Pool>,
+    path: web::Path<i32>,
+) -> Result<impl Responder, Error> {
+    if let Ok(Some(user_id)) = session.get::<i32>("user_id") {
+        let conn = get_db_conn(&pool).await?;
+        let playlist_id = path.into_inner();
+        let playlist_to_send = web::block(move || db::get_playlist_db(&conn, &playlist_id))
+            .await?
+            .map_err(ErrorInternalServerError)?;
+        Ok(HttpResponse::Ok().json(playlist_to_send))
+    } else {
+        Ok(redirect!("/"))
+    }
+}
+
+#[get("/get_videos_in_playlist/{playlist_id}")]
+async fn get_videos_in_playlist(
+    session: Session,
+    pool: web::Data<Pool>,
+    path: web::Path<i32>,
+) -> Result<impl Responder, Error> {
+    if let Ok(Some(user_id)) = session.get::<i32>("user_id") {
+        let conn = get_db_conn(&pool).await?;
+        let playlist_id = path.into_inner();
+        let videos_list: Vec<db::VideoInfo> = web::block(move || db::get_videos_in_playlist_db(&conn, &playlist_id))
+            .await?
+            .map_err(ErrorInternalServerError)?;
+        Ok(HttpResponse::Ok().json(videos_list))
+    } else {
+        Ok(redirect!("/"))
+    }
+}
+
 #[post("/post_comment")]
 async fn post_comment(
     pool: web::Data<Pool>,
@@ -738,8 +890,10 @@ async fn main() -> std::io::Result<()> {
                     .service(upload_video_page)
                     .service(create_video)
                     .service(create_short)
+                    .service(create_playlist)
                     .service(users)
                     .service(playlist)
+                    .service(playlist_page)
                     .service(shorts),
             )
             .service(fetch_all_videos)
@@ -747,6 +901,10 @@ async fn main() -> std::io::Result<()> {
             .service(stream_shorts)
             .service(no_permission)
             .service(get_video_info)
+            .service(get_playlist_public)
+            .service(get_playlist_private)
+            .service(get_playlist)
+            .service(get_videos_in_playlist)
             .service(logout)
             .service(get_user_info)
             .service(get_user_info_with_name)
@@ -761,6 +919,7 @@ async fn main() -> std::io::Result<()> {
             .service(update_like)
             .service(update_dislike)
             .service(increase_view_count)
+            .service(get_all_users)
     })
     .bind(("0.0.0.0", 8000))?
     .run()

@@ -3,9 +3,11 @@ use std::{thread::sleep, time::Duration};
 use actix_web::{Error, error, web};
 use ffmpeg_next::chroma::location;
 
-use rusqlite::{OptionalExtension, Result, Statement, params};
+use rusqlite::{OptionalExtension, Result, Statement, params, params_from_iter};
 use serde::{Deserialize, Serialize};
+use rusqlite::types::ToSql;
 
+use crate::playlist;
 pub type Pool = r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>;
 pub type Connection = r2d2::PooledConnection<r2d2_sqlite::SqliteConnectionManager>;
 
@@ -425,6 +427,161 @@ pub fn increase_view_count_db(conn: &Connection, video_id: &i32) -> Result<()> {
     Ok(())
 }
 
+pub fn get_all_users_db(conn: &Connection) -> Result<Vec<UserInfo>> {
+    let mut stmt = conn.prepare("SELECT UserID, name, about FROM users LIMIT 50")?;
+    let users = stmt
+        .query_map([], |row| {
+            Ok(UserInfo {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                about: row.get(2)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(users)
+}
+
+pub fn get_playlists_public_db(conn: &Connection) -> Result<Vec<PlaylistInfo>> {
+    let mut stmt = conn.prepare(
+        "SELECT PlaylistID, name, description FROM playlist WHERE is_private = 0",
+    )?;
+
+    let playlists = stmt
+        .query_map([], |row| {
+            Ok(PlaylistInfo {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                description: row.get(2)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(playlists)
+}
+
+pub fn get_playlists_private_db(conn: &Connection, user_id: &u32) -> Result<Vec<PlaylistInfo>> {
+    let mut stmt = conn.prepare(
+        "SELECT PlaylistID, name, description FROM playlist WHERE is_private = 1 AND owner_UserID = ?1",
+    )?;
+
+    let playlists = stmt
+        .query_map([user_id], |row| {
+            Ok(PlaylistInfo {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                description: row.get(2)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(playlists)
+}
+
+
+pub fn check_videos_private(conn: &Connection, video_ids: &[i32]) -> Result<bool> {
+    if video_ids.is_empty() {
+        return Ok(false);
+    }
+
+    let placeholders = std::iter::repeat("?")
+        .take(video_ids.len())
+        .collect::<Vec<_>>()
+        .join(",");
+
+    let sql = format!(
+        "SELECT COUNT(*) FROM videos \
+         WHERE is_private = 1 \
+           AND videoID IN ({})",
+        placeholders,
+    );
+
+    let mut stmt = conn.prepare(&sql)?;
+
+    let count: i32 = stmt.query_row(
+        params_from_iter(video_ids.iter()),
+        |row| row.get(0),
+    )?;
+
+    println!("Count of private videos: {}", count);
+    Ok(count > 0)
+}
+
+
+pub fn create_playlist_db(
+    conn: &Connection,
+    name: &str,
+    description: &str,
+    video_ids: &[i32],
+    user_ids: &[i32],
+    user_id: &u32,
+    is_private: bool,
+) -> Result<()> {
+    let mut stmt = conn.prepare(
+        "INSERT INTO playlist (name, description, is_private, owner_userID) VALUES (?1, ?2, ?3, ?4)",
+    )?;
+    stmt.execute(params![name, description, is_private as i32, user_id])?;
+
+    let playlist_id = conn.last_insert_rowid() as i32;
+
+    let placeholders_for_videos_in_playlist = std::iter::repeat("(?, ?)")
+    .take(video_ids.len()).collect::<Vec<_>>().join(",");
+
+    let sql_videos_in_playlist = format!("INSERT INTO videos_in_playlist (PlaylistID, videoID) VALUES {}", placeholders_for_videos_in_playlist);
+     let mut params: Vec<&dyn ToSql> = Vec::with_capacity(video_ids.len() * 2);
+    for vid in video_ids {
+        params.push(&playlist_id);
+        params.push(vid);
+    }
+
+    conn.execute(&sql_videos_in_playlist, params.as_slice())?;
+    println!("Successfully Insert vid in playlist");
+
+     let placeholders_for_videos_in_playlist = std::iter::repeat("(?, ?)")
+    .take(user_ids.len()).collect::<Vec<_>>().join(",");
+    let sql_user_rights_in_playlist = format!("INSERT INTO access_rights_playlist (PlaylistID, UserID) VALUES {}", placeholders_for_videos_in_playlist);
+    let mut params: Vec<&dyn ToSql> = Vec::with_capacity(user_ids.len() * 2);
+    for uid in user_ids {
+        params.push(&playlist_id);
+        params.push(uid);
+    }
+
+    conn.execute(&sql_user_rights_in_playlist, params.as_slice())?;
+    println!("Successfully Inserted UserID");
+    Ok(())
+}
+
+
+pub fn get_playlist_db(conn: &Connection, playlist_id: &i32) -> Result<PlaylistInfo> {
+    let playlist_info = conn.query_row("SELECT PlaylistID, name, description FROM playlist WHERE PlaylistID = ?1", [playlist_id], |row| {
+        Ok(PlaylistInfo {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            description: row.get(2)?,
+        })
+    })?;
+    Ok(playlist_info)
+}
+
+pub fn get_videos_in_playlist_db(conn: &Connection, playlist_id: &i32) -> Result<Vec<VideoInfo>> {
+    let mut stmt = conn.prepare("SELECT videoid, name, description, thumbnail_path, path, is_private, location, userId, likes, dislikes, clicks FROM videos WHERE videoID IN (SELECT videoID FROM videos_in_playlist WHERE PlaylistID = ?1)")?;
+    let videos = stmt
+        .query_map([playlist_id], |row| {
+            Ok(VideoInfo {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                description: row.get(2)?,
+                thumbnail_path: row.get(3)?,
+                path: row.get(4)?,
+                is_private: row.get(5)?,
+                location: row.get(6)?,
+                userId: row.get(7)?,
+                likes: row.get(8)?,
+                dislikes: row.get(9)?,
+                clicks: row.get(10)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(videos)
+}
+
 //Structs
 #[derive(Debug, serde::Serialize)]
 pub struct VideoInfo {
@@ -480,4 +637,11 @@ pub struct CommentWithUserInfo {
 #[derive(Debug, serde::Serialize)]
 pub struct LikeStatus {
     status: String,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct PlaylistInfo {
+    pub id: i32,
+    pub name: String,
+    pub description: String,
 }
