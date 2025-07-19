@@ -50,7 +50,11 @@ async def signup(client: AsyncClient, username: str, password:str, logger):
     #logger.info(f"Starting signup process for user: {username}")
     signup_data = {"username": username,
                    "password": password}
-    response = await client.post("/newuser", data=signup_data)
+    try:
+        response = await client.post("/newuser", data=signup_data)
+    except:
+        raise MumbleException("/newuser endpoint dont responded")
+        
     status_code = response.status_code
     #logger.info(f"Received status code {status_code} for signup process")
     if status_code in [303]:
@@ -64,7 +68,10 @@ async def login(client: AsyncClient, username:str, password: str, logger):
     #logger.info(f"Starting login process for user: {username} and password {password}")
     login_data = {"username": username,
                    "password": password}
-    response = await client.post("/checkcredentials", data=login_data)
+    try:
+        response = await client.post("/checkcredentials", data=login_data)
+    except:
+        raise MumbleException("/checkcredentials endpoint dont responded")
     #logger.info(f"Response of /checkcredentials with status: {response.status_code} and with content {response.text}")
     status_code = response.status_code
     if status_code in [303] and response.headers.get("Location") == "/app/home":
@@ -181,6 +188,7 @@ async def upload_private_video(client: AsyncClient, description, location, title
     }
     
     #logger.info(f"Uploading file {Path(path).name}, from path {path}")
+    
     response = await client.post("/app/create_video", files=files)
    
    status_code = response.status_code
@@ -314,33 +322,36 @@ async def putflag_video(
     client: AsyncClient,
     logger: LoggerAdapter,    
 ) -> None:
-    username: str = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    password: str = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
+    try:
+        username: str = "".join(
+            random.choices(string.ascii_uppercase + string.digits, k=12)
+        )
+        password: str = "".join(
+            random.choices(string.ascii_uppercase + string.digits, k=12)
+        )
 
-    logger.debug(f"Connecting to service")
-    # Register a new user
-    await signup(client,username, password,logger)
-    # Login
-    await login(client, username, password,logger)
-    
-    #Create Data for video
-    title = generate_title()
-    location = generate_location()
-    description: str  = task.flag
-    logger.debug(f"Creating video with right metadata for exploit")
-    path = create_video_with_metadata(creator=username, location=location, title=title,logger=logger)
-    logger.debug(f"Saving flag in video {title} location: {location}, description(flag): {description}")
-    await upload_private_video(client, description, location, title, logger, path)
-    
+        logger.debug(f"Connecting to service")
+        # Register a new user
+        await signup(client,username, password,logger)
+        # Login
+        await login(client, username, password,logger)
+        
+        #Create Data for video
+        title = generate_title()
+        location = generate_location()
+        description: str  = task.flag
+        logger.debug(f"Creating video with right metadata for exploit")
+        path = create_video_with_metadata(creator=username, location=location, title=title,logger=logger)
+        logger.debug(f"Saving flag in video {title} location: {location}, description(flag): {description}")
+        await upload_private_video(client, description, location, title, logger, path)
+        
 
-    #save flag and userdata
-    await db.set("userdata", (username, password, title, description))
+        #save flag and userdata
+        await db.set("userdata", (username, password, title, description))
 
-    return username
+        return username
+    except:
+        raise MumbleException("Video Upload Failed")
 
 @checker.getflag(0)
 async def getflag_video(
@@ -351,13 +362,16 @@ async def getflag_video(
     except KeyError:
         raise MumbleException("Missing database entry from putflag")
 
-    logger.debug(f"getflag(0) for the user {username} and video {title} flag should be {description}")
-    await login(client, username, password,logger)
+    try:
+        logger.debug(f"getflag(0) for the user {username} and video {title} flag should be {description}")
+        await login(client, username, password,logger)
 
-    #logger.info(f"try to access flag in /app/myprofile")
-    response = await client.get("/get_my_videos")
-    logger.debug("response.text is: " + response.text)
-    assert_in(task.flag, response.text, "Flag missing")
+        #logger.info(f"try to access flag in /app/myprofile")
+        response = await client.get("/get_my_videos")
+        logger.debug("response.text is: " + response.text)
+        assert_in(task.flag, response.text, "Flag missing")
+    except:
+        raise MumbleException("Watching video didnt worked")
         
 
 @checker.putflag(1)
@@ -367,30 +381,33 @@ async def putflag_short(
     client: AsyncClient,
     logger: LoggerAdapter,    
 ) -> None:
-    username: str = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    password: str = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
+    try:
+        username: str = "".join(
+            random.choices(string.ascii_uppercase + string.digits, k=12)
+        )
+        password: str = "".join(
+            random.choices(string.ascii_uppercase + string.digits, k=12)
+        )
 
-    logger.debug(f"Connecting to service")
-    # Register a new user
-    await signup(client,username, password,logger)
-    # Login
-    await login(client, username, password,logger)
-    
-    short_title = generate_short_title()
-    description = generate_short_description()
-    subtitles = task.flag
-    translate_to_spanish = True
-    
-    await upload_short(client, logger, short_title, description, subtitles, translate_to_spanish)
+        logger.debug(f"Connecting to service")
+        # Register a new user
+        await signup(client,username, password,logger)
+        # Login
+        await login(client, username, password,logger)
+        
+        short_title = generate_short_title()
+        description = generate_short_description()
+        subtitles = task.flag
+        translate_to_spanish = True
+        
+        await upload_short(client, logger, short_title, description, subtitles, translate_to_spanish)
 
-    await db.set("userdata2", (username, password, short_title))
-    #logger.info(f"User data saved for {username}, and uploaded successfully")
-    
-    return short_title
+        await db.set("userdata2", (username, password, short_title))
+        #logger.info(f"User data saved for {username}, and uploaded successfully")
+        
+        return short_title
+    except:
+        raise MumbleException("Uploading Short dindt work")
 
 @checker.getflag(1)
 async def getflag_short(
@@ -401,52 +418,56 @@ async def getflag_short(
     except KeyError:
         raise MumbleException("Missing database entry from putflag")
     
-    logger.debug(f"getflag(1) for the user {username} and short {short_title} flag should be {task.flag}")
-    await login(client, username, password,logger)
-    
-    #logger.info(f"try to access flag in /app/get_shorts")
-    response = await client.get("/get_shorts")
     try:
-        json = response.json()
-    except ValueError:
-        logger.error("Failed to parse JSON response")
-        raise MumbleException("Failed to parse JSON response from /get_shorts")
+        logger.debug(f"getflag(1) for the user {username} and short {short_title} flag should be {task.flag}")
+        await login(client, username, password,logger)
+        
+        #logger.info(f"try to access flag in /app/get_shorts")
+        response = await client.get("/get_shorts")
+        try:
+            json = response.json()
+        except ValueError:
+            logger.error("Failed to parse JSON response")
+            raise MumbleException("Failed to parse JSON response from /get_shorts")
 
-    logger.debug("response.json is: " + str(json))
-    
-    # Check if the short with the title exists
-    for short in json:
-        ##logger.info(f"Checking short: {short.get('title')}")
-        if short.get("name") == short_title:
-            #logger.info(f"Found short with title {short_title}")
-            assert_in(task.flag, short.get("original_captions"), "Flag missing")
-            return
-    
-    raise MumbleException(f"Short with title {short_title} not found in response")
+        logger.debug("response.json is: " + str(json))
+        
+        # Check if the short with the title exists
+        for short in json:
+            ##logger.info(f"Checking short: {short.get('title')}")
+            if short.get("name") == short_title:
+                #logger.info(f"Found short with title {short_title}")
+                assert_in(task.flag, short.get("original_captions"), "Flag missing")
+                return
+        
+        raise MumbleException(f"Short with title {short_title} not found in response")
+    except:
+        raise MumbleException("Watching Short didnt worked")
 
 @checker.putnoise(0)
 async def putnoise_video(task: PutnoiseCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, client: AsyncClient):
-    logger
-    username: str = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    password: str = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
+    try:
+        username: str = "".join(
+            random.choices(string.ascii_uppercase + string.digits, k=12)
+        )
+        password: str = "".join(
+            random.choices(string.ascii_uppercase + string.digits, k=12)
+        )
 
-    logger.debug(f"Connecting to service")
-    # Register a new user
-    await signup(client,username, password,logger)
-    # Login
-    await login(client, username, password,logger)
+        logger.debug(f"Connecting to service")
+        # Register a new user
+        await signup(client,username, password,logger)
+        # Login
+        await login(client, username, password,logger)
 
-    #Create Data for video
-    title = generate_title()
-    description = generate_description()
-    await upload_public_video(client, logger, title, description)
-    
-    await db.set('information', (username, password, title, description))
-   
+        #Create Data for video
+        title = generate_title()
+        description = generate_description()
+        await upload_public_video(client, logger, title, description)
+        
+        await db.set('information', (username, password, title, description))
+    except:
+       raise MumbleException("Uploading Video Didnt worked")
 
 
 @checker.getnoise(0)
@@ -458,36 +479,42 @@ async def getnoise_video(task: GetnoiseCheckerTaskMessage, db: ChainDB, logger: 
         logger.error("Putnoise 0 (video) failed : DB couldnt get information")
         raise MumbleException('Putnoise(0) failed')
     
-    await login(client, username, password, logger)
-    response = await client.get("/get_my_videos")
-    logger.debug("response.text is: " + response.text)
-    assert_in(description, response.text, "Flag missing")
-    
+    try:
+        await login(client, username, password, logger)
+        response = await client.get("/get_my_videos")
+        logger.debug("response.text is: " + response.text)
+        assert_in(description, response.text, "Flag missing")
+    except:
+        raise MumbleException("Watching video didnt worked")
     
 @checker.putnoise(1)
 async def putnoise_profile_description(task: PutnoiseCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, client: AsyncClient):
-    username: str = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    password: str = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
+    try:
+        username: str = "".join(
+            random.choices(string.ascii_uppercase + string.digits, k=12)
+        )
+        password: str = "".join(
+            random.choices(string.ascii_uppercase + string.digits, k=12)
+        )
 
-    logger.debug(f"Connecting to service")
-    # Register a new user
-    await signup(client,username, password,logger)
-    # Login
-    await login(client, username, password,logger)
-    
-    about = {"about":generate_about()}
-    
-    response = await client.post("/update_about", data=about)
-    
-    if response.status_code != 303:
-        logger.error(f"/update about should return 303 but returned {response.status_code}")
-        raise MumbleException("/update_about didn't work")
-    
-    await db.set('information1', (username, password, about))
+        logger.debug(f"Connecting to service")
+        # Register a new user
+        await signup(client,username, password,logger)
+        # Login
+        await login(client, username, password,logger)
+        
+        about = {"about":generate_about()}
+        
+        response = await client.post("/update_about", data=about)
+        
+        if response.status_code != 303:
+            logger.error(f"/update about should return 303 but returned {response.status_code}")
+            raise MumbleException("/update_about didn't work")
+        
+        await db.set('information1', (username, password, about))
+    except:
+        logger.error("Putnoise 1 (description) failed")
+        raise MumbleException('Changing profile description failed')
     
 
 @checker.getnoise(1)
@@ -499,44 +526,51 @@ async def getnoise_profile_description(task: GetnoiseCheckerTaskMessage, db: Cha
         logger.error("Putnoise 1 (description) failed : DB couldnt get information")
         raise MumbleException('Putnoise(1) failed')
     
-    await login(client, username, password, logger)
-    
-    response = await client.get("get_my_profile")
-    if response.status_code != 200:
-        raise MumbleException()
-    
-    json = response.json()
-    #logger.info(f"Json Response about is {json} {response}")
-    about_in_response = json.get("about")
-    
-    if about_in_response != about.get("about"):
-        raise MumbleException(f"About in profile and about that was saved are different {about} != {about_in_response}")
+    try:
+        await login(client, username, password, logger)
+        
+        response = await client.get("get_my_profile")
+        if response.status_code != 200:
+            raise MumbleException()
+        
+        json = response.json()
+        #logger.info(f"Json Response about is {json} {response}")
+        about_in_response = json.get("about")
+        
+        if about_in_response != about.get("about"):
+            raise MumbleException(f"About in profile and about that was saved are different {about} != {about_in_response}")
+    except:
+        raise MumbleException("Getting profile description didnt worked")
     
     #logger.info("getnoise(1) (description) worked fine")
     
     
 @checker.putnoise(2)
 async def putnoise_short_description(task: PutnoiseCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, client: AsyncClient):
-    username: str = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    password: str = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
+    try:
+        username: str = "".join(
+            random.choices(string.ascii_uppercase + string.digits, k=12)
+        )
+        password: str = "".join(
+            random.choices(string.ascii_uppercase + string.digits, k=12)
+        )
 
-    logger.debug(f"Connecting to service")
-    # Register a new user
-    await signup(client,username, password,logger)
-    # Login
-    await login(client, username, password,logger)
+        logger.debug(f"Connecting to service")
+        # Register a new user
+        await signup(client,username, password,logger)
+        # Login
+        await login(client, username, password,logger)
 
-    short_title = generate_short_title()
-    description = generate_short_description()
-    subtitles = "This is a test subtitle"
-    translate_to_spanish = False
-    
-    await upload_short(client, logger, short_title, description, subtitles, translate_to_spanish)
-    await db.set('information3', (username, password, short_title, description))
+        short_title = generate_short_title()
+        description = generate_short_description()
+        subtitles = "This is a test subtitle"
+        translate_to_spanish = False
+        
+        await upload_short(client, logger, short_title, description, subtitles, translate_to_spanish)
+        await db.set('information3', (username, password, short_title, description))
+    except:
+        logger.error("Putnoise 2 (short description) failed")
+        raise MumbleException('Uploading Short didnt worked')
 
 @checker.getnoise(2)
 async def getnoise_short_description(task: GetnoiseCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, client: AsyncClient):
@@ -547,66 +581,72 @@ async def getnoise_short_description(task: GetnoiseCheckerTaskMessage, db: Chain
         logger.error("Putnoise 2 (short description) failed : DB couldnt get information")
         raise MumbleException('Putnoise(2) failed')
     
-    await login(client, username, password, logger)
-    
-    response = await client.get("/get_shorts")
     try:
-        json = response.json()
-    except ValueError:
-        logger.error("Failed to parse JSON response from /get_shorts")
-        raise MumbleException("Failed to parse JSON response from /get_shorts")
+        await login(client, username, password, logger)
+        
+        response = await client.get("/get_shorts")
+        try:
+            json = response.json()
+        except ValueError:
+            logger.error("Failed to parse JSON response from /get_shorts")
+            raise MumbleException("Failed to parse JSON response from /get_shorts")
 
-    logger.debug("response.json is: " + str(json))
-    
-    for short in json:
-        if short.get("name") == short_title:
-            #logger.info(f"Found short with title {short_title}")
-            assert_in(description, short.get("description"), "Description is wrong or missing")
-            return
-    
-    raise MumbleException(f"Short with title {short_title} not found in response")
-
+        logger.debug("response.json is: " + str(json))
+        
+        for short in json:
+            if short.get("name") == short_title:
+                #logger.info(f"Found short with title {short_title}")
+                assert_in(description, short.get("description"), "Description is wrong or missing")
+                return
+        
+        raise MumbleException(f"Short with title {short_title} not found in response")
+    except:
+        logger.error("Getnoise 2 (short description) failed")
+        raise MumbleException("Getting Short didnt worked")
 
 @checker.putnoise(3)
 async def putnoise_create_playlist_private(task: PutnoiseCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, client: AsyncClient):
-    username: str = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    password: str = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    
-    await signup(client, username, password, logger)
-    await login(client, username, password, logger)
-    logger.debug(f"Creating a playlist for user {username}")
-    playlist_name = generate_playlist_name()
-    playlist_description = generate_description()
+    try:
+        username: str = "".join(
+            random.choices(string.ascii_uppercase + string.digits, k=12)
+        )
+        password: str = "".join(
+            random.choices(string.ascii_uppercase + string.digits, k=12)
+        )
+        
+        await signup(client, username, password, logger)
+        await login(client, username, password, logger)
+        logger.debug(f"Creating a playlist for user {username}")
+        playlist_name = generate_playlist_name()
+        playlist_description = generate_description()
 
-    user_res = await client.get("/get_all_users")
-    user_ids = [user.get("id") for user in user_res.json()]
-    one_user_id = user_ids[0] if user_ids else None
-    
-    video_res = await client.get("/api/fetch_all_videos")
-    video_ids = [video.get("id") for video in video_res.json()]
-    sample_video_ids = random.sample(video_ids, min(3, len(video_ids)))
-    
-    
-    
-    response = await client.post("/app/create_playlist", data={
-        "name": playlist_name,
-        "description": playlist_description,
-        "video_ids[]": sample_video_ids,
-        "user_ids[]": one_user_id,
-        "is_private": "true"
-    })
-    
-    status_code = response.status_code
-    if status_code != 303:
-        logger.error(f"Failed to create playlist, status code: {status_code}, response: {response.text}")
-        raise MumbleException(f"Failed to create playlist, status code: {status_code}")
-    
-    logger.debug(f"Playlist {playlist_name} created successfully")
-    await db.set('playlist_info', (username, password, playlist_name, playlist_description))
+        user_res = await client.get("/get_all_users")
+        user_ids = [user.get("id") for user in user_res.json()]
+        one_user_id = user_ids[0] if user_ids else None
+        
+        video_res = await client.get("/api/fetch_all_videos")
+        video_ids = [video.get("id") for video in video_res.json()]
+        sample_video_ids = random.sample(video_ids, min(3, len(video_ids)))
+        
+        
+        
+        response = await client.post("/app/create_playlist", data={
+            "name": playlist_name,
+            "description": playlist_description,
+            "video_ids[]": sample_video_ids,
+            "user_ids[]": one_user_id,
+            "is_private": "true"
+        })
+        
+        status_code = response.status_code
+        if status_code != 303:
+            logger.error(f"Failed to create playlist, status code: {status_code}, response: {response.text}")
+            raise MumbleException(f"Failed to create playlist, status code: {status_code}")
+        
+        logger.debug(f"Playlist {playlist_name} created successfully")
+        await db.set('playlist_info', (username, password, playlist_name, playlist_description))
+    except:
+        raise MumbleException("Creating playlist didnt worked")
 
 
 @checker.getnoise(3)
@@ -617,64 +657,69 @@ async def getnoise_create_playlist_private(task: GetnoiseCheckerTaskMessage, db:
     except KeyError:
         logger.error("Putnoise 3 (create playlist) failed : DB couldnt get information")
         raise MumbleException('Putnoise(3) failed')
-    
-    await login(client, username, password, logger
-)
-    response = await client.get("/get_playlists_private")
     try:
-        json = response.json()
-    except ValueError:
-        logger.error("Failed to parse JSON response from /get_playlists_private")
-        raise MumbleException("Failed to get Playlist")
-    
-    for playlist in json:
-        if playlist.get("name") == playlist_name:
-            #logger.info(f"Found playlist with name {playlist_name}")
-            assert_in(playlist_description, playlist.get("description"), "Playlist description is wrong or missing")
-            return
+        await login(client, username, password, logger)
+        response = await client.get("/get_playlists_private")
+        try:
+            json = response.json()
+        except ValueError:
+            logger.error("Failed to parse JSON response from /get_playlists_private")
+            raise MumbleException("Failed to get Playlist")
+        
+        for playlist in json:
+            if playlist.get("name") == playlist_name:
+                #logger.info(f"Found playlist with name {playlist_name}")
+                assert_in(playlist_description, playlist.get("description"), "Playlist description is wrong or missing")
+                return
 
-    raise MumbleException(f"Private playlist was not retrievable")
+        raise MumbleException(f"Private playlist was not retrievable")
+    except:
+        logger.error("Getnoise 3 (create playlist) failed")
+        raise MumbleException("Getting Playlist didnt worked")
 
 @checker.putnoise(4)
 async def putnoise_create_playlist_public(task: PutnoiseCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, client: AsyncClient):
-    username: str = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    password: str = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    
-    await signup(client, username, password, logger)
-    await login(client, username, password, logger)
-    logger.debug(f"Creating a public playlist for user {username}")
-    playlist_name = generate_playlist_name()
-    playlist_description = generate_description()
+    try:
+        username: str = "".join(
+            random.choices(string.ascii_uppercase + string.digits, k=12)
+        )
+        password: str = "".join(
+            random.choices(string.ascii_uppercase + string.digits, k=12)
+        )
+        
+        await signup(client, username, password, logger)
+        await login(client, username, password, logger)
+        logger.debug(f"Creating a public playlist for user {username}")
+        playlist_name = generate_playlist_name()
+        playlist_description = generate_description()
 
-    user_res = await client.get("/get_all_users")
-    user_ids = [user.get("id") for user in user_res.json()]
-    one_user_id = user_ids[0] if user_ids else None
-    
-    
-    video_res = await client.get("/api/fetch_all_videos")
-    video_ids = [video.get("id") for video in video_res.json()]
-    sample_video_ids = random.sample(video_ids, min(3, len(video_ids)))
+        user_res = await client.get("/get_all_users")
+        user_ids = [user.get("id") for user in user_res.json()]
+        one_user_id = user_ids[0] if user_ids else None
+        
+        
+        video_res = await client.get("/api/fetch_all_videos")
+        video_ids = [video.get("id") for video in video_res.json()]
+        sample_video_ids = random.sample(video_ids, min(3, len(video_ids)))
 
-    
-    response = await client.post("/app/create_playlist", data={
-        "name": playlist_name,
-        "description": playlist_description,
-        "video_ids[]": sample_video_ids,
-        "user_ids[]": one_user_id,
-        "is_private": "false"
-    })
-    
-    status_code = response.status_code
-    if status_code != 303:
-        logger.error(f"Failed to create public playlist, status code: {status_code}, response: {response.text}")
-        raise MumbleException(f"Failed to create public playlist, status code: {status_code}")
-    
-    logger.debug(f"Public Playlist {playlist_name} created successfully")
-    await db.set('public_playlist_info', (username, password, playlist_name, playlist_description))
+        
+        response = await client.post("/app/create_playlist", data={
+            "name": playlist_name,
+            "description": playlist_description,
+            "video_ids[]": sample_video_ids,
+            "user_ids[]": one_user_id,
+            "is_private": "false"
+        })
+        
+        status_code = response.status_code
+        if status_code != 303:
+            logger.error(f"Failed to create public playlist, status code: {status_code}, response: {response.text}")
+            raise MumbleException(f"Failed to create public playlist, status code: {status_code}")
+        
+        logger.debug(f"Public Playlist {playlist_name} created successfully")
+        await db.set('public_playlist_info', (username, password, playlist_name, playlist_description))
+    except:
+        raise MumbleException("Creating public playlist didnt worked")
 
 
 @checker.getnoise(4)
@@ -685,45 +730,51 @@ async def getnoise_create_playlist_public(task: GetnoiseCheckerTaskMessage, db: 
         logger.error("Putnoise 4 (create public playlist) failed : DB couldnt get information")
         raise MumbleException('Putnoise(4) failed')
     
-    await login(client, username, password, logger)
-    response = await client.get("/get_playlists_public")
     try:
-        json = response.json()
-    except ValueError:
-        logger.error("Failed to parse JSON response from /get_playlists_public")
-        raise MumbleException("Failed to get Public Playlist")
-    
-    for playlist in json:
-        if playlist.get("name") == playlist_name:
-            #no more check because name isnt unique
-            return
-    raise MumbleException(f"Public playlist was not retrievable")
+        await login(client, username, password, logger)
+        response = await client.get("/get_playlists_public")
+        try:
+            json = response.json()
+        except ValueError:
+            logger.error("Failed to parse JSON response from /get_playlists_public")
+            raise MumbleException("Failed to get Public Playlist")
+        
+        for playlist in json:
+            if playlist.get("name") == playlist_name:
+                #no more check because name isnt unique
+                return
+        raise MumbleException(f"Public playlist was not retrievable")
+    except:
+        raise MumbleException("Getting Playlist didnt worked")
 
 @checker.putnoise(5)
 async def putnoise_different_text_different_translation(task: PutnoiseCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, client: AsyncClient):
-    username: str = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    password: str = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    
-    await signup(client, username, password, logger)
-    await login(client, username, password, logger)
-    
-    short_title = generate_short_title()
-    short_title2 = generate_short_title()  # Generate a different title for the second short
-    description = generate_short_description()
-    subtitles = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    subtitles2 = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    translate_to_spanish = True
-    await upload_short(client, logger, short_title, description, subtitles, translate_to_spanish, upload_same_video=True)
-    await upload_short(client, logger, short_title2, description, subtitles2, translate_to_spanish, upload_same_video=True)
-    await db.set('information4', (username, password, short_title, short_title2, subtitles, subtitles2))
+    try:
+        username: str = "".join(
+            random.choices(string.ascii_uppercase + string.digits, k=12)
+        )
+        password: str = "".join(
+            random.choices(string.ascii_uppercase + string.digits, k=12)
+        )
+        
+        await signup(client, username, password, logger)
+        await login(client, username, password, logger)
+        
+        short_title = generate_short_title()
+        short_title2 = generate_short_title()  # Generate a different title for the second short
+        description = generate_short_description()
+        subtitles = "".join(
+            random.choices(string.ascii_uppercase + string.digits, k=12)
+        )
+        subtitles2 = "".join(
+            random.choices(string.ascii_uppercase + string.digits, k=12)
+        )
+        translate_to_spanish = True
+        await upload_short(client, logger, short_title, description, subtitles, translate_to_spanish, upload_same_video=True)
+        await upload_short(client, logger, short_title2, description, subtitles2, translate_to_spanish, upload_same_video=True)
+        await db.set('information4', (username, password, short_title, short_title2, subtitles, subtitles2))
+    except:
+        raise MumbleException("Uploading Short didnt worked")
 
 @checker.getnoise(5)
 async def getnoise_different_text_different_translation(task: GetnoiseCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, client: AsyncClient):
@@ -733,51 +784,56 @@ async def getnoise_different_text_different_translation(task: GetnoiseCheckerTas
     except KeyError:
         logger.error("Putnoise 5 (different text different translation) failed : DB couldnt get information")
         raise MumbleException('Putnoise(5) failed')
-    
-    await login(client, username, password, logger)
-    response = await client.get("/get_shorts")
-    json = response.json()
-    #logger.info(f"Shorts response: {json}")
-    for short in json:
-        if short.get("name") == short_title:
-            caption_path = short.get("caption_path")
-            captions = await client.get(caption_path)
-            if captions.status_code != 200:
-                raise MumbleException(f"Failed to get captions for the short {short_title}, status code: {captions.status_code}")
-            
-        if short.get("name") == short_title2:
-            caption_path2 = short.get("caption_path")
-            captions2 = await client.get(caption_path2)
-            if captions2.status_code != 200:
-                raise MumbleException(f"Failed to get captions for the short {short_title2}, status code: {captions2.status_code}")
-    
-    if captions.text == captions2.text:
-        raise MumbleException(f"Captions(vtt) for the shorts {short_title}: {captions.text} and {short_title2}: {captions2.text} are the same, but they should be different")
+    try:
+        await login(client, username, password, logger)
+        response = await client.get("/get_shorts")
+        json = response.json()
+        #logger.info(f"Shorts response: {json}")
+        for short in json:
+            if short.get("name") == short_title:
+                caption_path = short.get("caption_path")
+                captions = await client.get(caption_path)
+                if captions.status_code != 200:
+                    raise MumbleException(f"Failed to get captions for the short {short_title}, status code: {captions.status_code}")
+                
+            if short.get("name") == short_title2:
+                caption_path2 = short.get("caption_path")
+                captions2 = await client.get(caption_path2)
+                if captions2.status_code != 200:
+                    raise MumbleException(f"Failed to get captions for the short {short_title2}, status code: {captions2.status_code}")
+        
+        if captions.text == captions2.text:
+            raise MumbleException(f"Captions(vtt) for the shorts {short_title}: {captions.text} and {short_title2}: {captions2.text} are the same, but they should be different")
+    except:
+        raise MumbleException("Getting Shorts didnt worked")
 
 
 @checker.putnoise(6)
 async def putnoise_same_text_same_translation(task: PutnoiseCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, client: AsyncClient):
     # #logger.info("havoc(4) same text same translation")
-    username: str = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    password: str = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    
-    await signup(client, username, password, logger)
-    await login(client, username, password, logger)
-    
-    short_title = generate_short_title()
-    short_title2 = generate_short_title()  # Generate a different title for the second short
-    description = generate_short_description()
-    subtitles = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    translate_to_spanish = True
-    await upload_short(client, logger, short_title, description, subtitles, translate_to_spanish, upload_same_video=True)
-    await upload_short(client, logger, short_title2, description, subtitles, translate_to_spanish, upload_same_video=True)
-    await db.set('information5', (username, password, short_title, short_title2, subtitles))
+    try:
+        username: str = "".join(
+            random.choices(string.ascii_uppercase + string.digits, k=12)
+        )
+        password: str = "".join(
+            random.choices(string.ascii_uppercase + string.digits, k=12)
+        )
+        
+        await signup(client, username, password, logger)
+        await login(client, username, password, logger)
+        
+        short_title = generate_short_title()
+        short_title2 = generate_short_title()  # Generate a different title for the second short
+        description = generate_short_description()
+        subtitles = "".join(
+            random.choices(string.ascii_uppercase + string.digits, k=12)
+        )
+        translate_to_spanish = True
+        await upload_short(client, logger, short_title, description, subtitles, translate_to_spanish, upload_same_video=True)
+        await upload_short(client, logger, short_title2, description, subtitles, translate_to_spanish, upload_same_video=True)
+        await db.set('information5', (username, password, short_title, short_title2, subtitles))
+    except:
+        raise MumbleException("Uploading Short didnt worked")
     
 @checker.getnoise(6)
 async def getnoise_same_text_same_translation(task: GetnoiseCheckerTaskMessage, db: ChainDB, logger: LoggerAdapter, client: AsyncClient):
@@ -788,156 +844,174 @@ async def getnoise_same_text_same_translation(task: GetnoiseCheckerTaskMessage, 
         logger.error("Putnoise 6 (same text same translation) failed : DB couldnt get information")
         raise MumbleException('Putnoise(6) failed')
     
-    await login(client, username, password, logger)
-    
-    response = await client.get("/get_shorts")
-    json = response.json()
-    #logger.info(f"Shorts response: {json}")
-    for short in json:
-        if short.get("name") == short_title:
-            caption_path = short.get("caption_path")
-            captions = await client.get(caption_path)
-            if captions.status_code != 200:
-                raise MumbleException(f"Failed to get captions for the short {short_title}, status code: {captions.status_code}")
-            
-        if short.get("name") == short_title2:
-            caption_path2 = short.get("caption_path")
-            captions2 = await client.get(caption_path2)
-            if captions2.status_code != 200:
-                raise MumbleException(f"Failed to get captions for the short {short_title2}, status code: {captions2.status_code}")
-    
-    if captions.text != captions2.text:
-        raise MumbleException(f"Translations (Caption): One text only has ONE translation")
+    try:
+        await login(client, username, password, logger)
+        
+        response = await client.get("/get_shorts")
+        json = response.json()
+        #logger.info(f"Shorts response: {json}")
+        for short in json:
+            if short.get("name") == short_title:
+                caption_path = short.get("caption_path")
+                captions = await client.get(caption_path)
+                if captions.status_code != 200:
+                    raise MumbleException(f"Failed to get captions for the short {short_title}, status code: {captions.status_code}")
+                
+            if short.get("name") == short_title2:
+                caption_path2 = short.get("caption_path")
+                captions2 = await client.get(caption_path2)
+                if captions2.status_code != 200:
+                    raise MumbleException(f"Failed to get captions for the short {short_title2}, status code: {captions2.status_code}")
+        
+        if captions.text != captions2.text:
+            raise MumbleException(f"Translations (Caption): One text only has ONE translation")
+    except:
+        raise MumbleException("Getting Shorts didnt worked")
 
 
 @checker.havoc(0)
 async def havoc_failed_login(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
-    username: str = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    password: str = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-
     try:
-        failed_login = await login(client, username, password, logger)
-    except MumbleException as e:
-        #logger.info(f"Failed login for user {username} with password {password} raised MumbleException: {e} like expected")
-        return
-    
-    raise MumbleException(f"Failed to get unauthorized response for user {username} with password {password}")
-    
+        username: str = "".join(
+            random.choices(string.ascii_uppercase + string.digits, k=12)
+        )
+        password: str = "".join(
+            random.choices(string.ascii_uppercase + string.digits, k=12)
+        )
+
+        try:
+            failed_login = await login(client, username, password, logger)
+        except MumbleException as e:
+            #logger.info(f"Failed login for user {username} with password {password} raised MumbleException: {e} like expected")
+            return
+        
+        raise MumbleException(f"Failed to get unauthorized response for user {username} with password {password}")
+    except:
+        raise MumbleException("Failed to check unauthorized access")
     #logger.info(f"havoc(0) FAILED login worked fine for user {username} with password {password}")
 
 @checker.havoc(1)
 async def havoc_get_logo(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
     #logger.info("havoc(1) get logo")
-    response = await client.get("/assets/ParcerroTV.svg")
-    if response.status_code != 200:
-        raise MumbleException(f"Failed to get ParceroTV svg logo, status code: {response.status_code}")
-    
-    #logger.info("havoc(1) get logo worked fine")
-    assert_in("<svg", response.text, "Logo SVG not found in response")
+    try:
+        response = await client.get("/assets/ParcerroTV.svg")
+        if response.status_code != 200:
+            raise MumbleException(f"Failed to get ParceroTV svg logo, status code: {response.status_code}")
+        
+        #logger.info("havoc(1) get logo worked fine")
+        assert_in("<svg", response.text, "Logo SVG not found in response")
+    except:
+        raise MumbleException("Failed to get logo")
 
 
 @checker.havoc(2)
 async def havoc_get_correct_vtt(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
-    #logger.info("havoc(3) get correct vtt")
-    username: str = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    password: str = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    await signup(client, username, password, logger)
-    await login(client, username, password, logger)
-    
-    short_title = generate_short_title()
-    description = generate_short_description()
-    subtitles = gererate_random_subtitles()
-    translate_to_spanish = False
-    
-    await upload_short(client, logger, short_title, description, subtitles, translate_to_spanish)
-    
-    response = await client.get("/get_shorts")
-    json = response.json()
-    logger.info(f"Shorts response: {json}")
-    
-    for short in json:
-        if short.get("name") == short_title:
-            caption_path = short.get("caption_path")
-            captions = await client.get(caption_path)
-            if captions.status_code != 200:
-                raise MumbleException(f"Failed to get captions for the short {short_title}, status code: {captions.status_code}")
-            logger.info(f"Captions for the short {short_title} are {captions.text}")
-            words = " ".join(extract_vtt_words(captions.text))
-            comida_arr = ' '.join(comida).split(" ")
+    try:
+        
+        #logger.info("havoc(3) get correct vtt")
+        username: str = "".join(
+            random.choices(string.ascii_uppercase + string.digits, k=12)
+        )
+        password: str = "".join(
+            random.choices(string.ascii_uppercase + string.digits, k=12)
+        )
+        await signup(client, username, password, logger)
+        await login(client, username, password, logger)
+        
+        short_title = generate_short_title()
+        description = generate_short_description()
+        subtitles = gererate_random_subtitles()
+        translate_to_spanish = False
+        
+        await upload_short(client, logger, short_title, description, subtitles, translate_to_spanish)
+        
+        response = await client.get("/get_shorts")
+        json = response.json()
+        logger.info(f"Shorts response: {json}")
+        
+        for short in json:
+            if short.get("name") == short_title:
+                caption_path = short.get("caption_path")
+                captions = await client.get(caption_path)
+                if captions.status_code != 200:
+                    raise MumbleException(f"Failed to get captions for the short {short_title}, status code: {captions.status_code}")
+                logger.info(f"Captions for the short {short_title} are {captions.text}")
+                words = " ".join(extract_vtt_words(captions.text))
+                comida_arr = ' '.join(comida).split(" ")
 
-            for word in words.split(" "):
-                assert_in(word, comida_arr, f"Captions generation is not correct")
-            return
-    raise MumbleException(f"Short with title {short_title} not found in response, cannot get captions")
+                for word in words.split(" "):
+                    assert_in(word, comida_arr, f"Captions generation is not correct")
+                return
+        raise MumbleException(f"Short with title {short_title} not found in response, cannot get captions")
+    except:
+        raise MumbleException("Getting correct vtt didnt worked")
 
 
 #For performance this maybe should not be included as noise (we see on 19)
 async def havoc_vtt_words_in_translation_array(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
     #logger.info("havoc(5) vtt words in translation array")
-    username: str = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    password: str = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    
-    await signup(client, username, password, logger)
-    await login(client, username, password, logger)
-    
-    short_title = generate_short_title()
-    description = generate_short_description()
-    subtitles = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    translate_to_spanish = True
-    await upload_short(client, logger, short_title, description, subtitles, translate_to_spanish)
-    
-    response = await client.get("/get_shorts")
-    json = response.json()
-    #logger.info(f"Shorts response: {json}")
-    
-    with open("spanish_words.txt", encoding="utf-8") as f:
-        raw = f.read()
-    wordlist = create_word_arr(raw)
-    
-    for short in json:
-        if short.get("name") == short_title:
-            caption_path = short.get("caption_path")
-            captions = await client.get(caption_path)
-            if captions.status_code != 200:
-                raise MumbleException(f"Failed to get captions for the short {short_title}, status code: {captions.status_code}")
-            #logger.info(f"Captions for the short {short_title} are {captions.text}")
-            vtt_words = extract_vtt_words(captions.text)
-            
-    for word in vtt_words:
-        assert_in(word, wordlist, f"The word {word} isnt part of the spanish vocabulary")
+    try:
+        username: str = "".join(
+            random.choices(string.ascii_uppercase + string.digits, k=12)
+        )
+        password: str = "".join(
+            random.choices(string.ascii_uppercase + string.digits, k=12)
+        )
+        
+        await signup(client, username, password, logger)
+        await login(client, username, password, logger)
+        
+        short_title = generate_short_title()
+        description = generate_short_description()
+        subtitles = "".join(
+            random.choices(string.ascii_uppercase + string.digits, k=12)
+        )
+        translate_to_spanish = True
+        await upload_short(client, logger, short_title, description, subtitles, translate_to_spanish)
+        
+        response = await client.get("/get_shorts")
+        json = response.json()
+        #logger.info(f"Shorts response: {json}")
+        
+        with open("spanish_words.txt", encoding="utf-8") as f:
+            raw = f.read()
+        wordlist = create_word_arr(raw)
+        
+        for short in json:
+            if short.get("name") == short_title:
+                caption_path = short.get("caption_path")
+                captions = await client.get(caption_path)
+                if captions.status_code != 200:
+                    raise MumbleException(f"Failed to get captions for the short {short_title}, status code: {captions.status_code}")
+                #logger.info(f"Captions for the short {short_title} are {captions.text}")
+                vtt_words = extract_vtt_words(captions.text)
+                
+        for word in vtt_words:
+            assert_in(word, wordlist, f"The word {word} isnt part of the spanish vocabulary")
+    except:
+        raise MumbleException("Getting vtt words in translation array didnt worked")
 
 
 @checker.havoc(3)
 async def havoc_get_vtt_index(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
-    username_attacker: str = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    password_attacker: str = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=12)
-    )
-    
-    await signup(client, username_attacker, password_attacker, logger)
-    await login(client, username_attacker, password_attacker, logger)
-    
-    vtts = await client.get("/vtt")
-    if vtts.status_code != 200:
+    try:
+        username_attacker: str = "".join(
+            random.choices(string.ascii_uppercase + string.digits, k=12)
+        )
+        password_attacker: str = "".join(
+            random.choices(string.ascii_uppercase + string.digits, k=12)
+        )
+        
+        await signup(client, username_attacker, password_attacker, logger)
+        await login(client, username_attacker, password_attacker, logger)
+        
+        vtts = await client.get("/vtt")
+        if vtts.status_code != 200:
+            raise MumbleException("Failed to get VTTs")
+        #logger.info(f"VTTs response: {vtts.text}")
+        assert_in("vtt", vtts.text, "VTTs not found in response")
+    except:
         raise MumbleException("Failed to get VTTs")
-    #logger.info(f"VTTs response: {vtts.text}")
-    assert_in("vtt", vtts.text, "VTTs not found in response")
     
 
 
@@ -945,26 +1019,29 @@ async def havoc_get_vtt_index(task: HavocCheckerTaskMessage, logger: LoggerAdapt
 @checker.havoc(4)
 async def havoc_get_different_static_html_files(task: HavocCheckerTaskMessage, logger: LoggerAdapter, client: AsyncClient):
     #logger.info("havoc(8) get different static html files")
-    # List of static HTML files to check
-    static_files = [
-        "/login",
-        "/register",
-        "/header",
-        "/footer",
-        "/aboutus",
-        "/help",
-        "/privacy",
-        "/terms",
-        "/developers",
-        "/jobs",
-        "/uploads_error",
-        "/unauthorized"
-    ]
-    for file in static_files:
-        response = await client.get(file)
-        if response.status_code != 200:
-            raise MumbleException(f"Failed to get static file {file}, status code: {response.status_code}")
-    #logger.info("havoc(8) get different static html files worked fine")
+    try:
+        # List of static HTML files to check
+        static_files = [
+            "/login",
+            "/register",
+            "/header",
+            "/footer",
+            "/aboutus",
+            "/help",
+            "/privacy",
+            "/terms",
+            "/developers",
+            "/jobs",
+            "/uploads_error",
+            "/unauthorized"
+        ]
+        for file in static_files:
+            response = await client.get(file)
+            if response.status_code != 200:
+                raise MumbleException(f"Failed to get static file {file}, status code: {response.status_code}")
+        #logger.info("havoc(8) get different static html files worked fine")
+    except:
+        raise MumbleException("Getting different static html files didnt worked")
 
 """
 EXPLOIT FUNCTIONS
