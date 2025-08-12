@@ -5,4 +5,4 @@ And Upload and watch Shorts (or Reels) with captions.
 
 The service was developed and played in ENOWARS9 and includes 2 vulnerabilities.
 
-[Click here for the full documentation](https://github.com/enowars/enowars9-service-parceroTV/documentation](https://github.com/enowars/enowars9-service-parceroTV/tree/main/documentation))
+[Click here for the full documentation](https://github.com/enowars/enowars9-service-parceroTV/tree/main/documentation)
