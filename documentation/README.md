@@ -2,8 +2,8 @@
 - [Introduction](https://github.com/enowars/enowars9-service-parceroTV/tree/main/documentation#introduction)
 - [Installation](https://github.com/enowars/enowars9-service-parceroTV/tree/main/documentation#installation)
 - [Functionality](https://github.com/enowars/enowars9-service-parceroTV/tree/main/documentation#functionality)
-- [Vulnerabilities](https://github.com/enowars/enowars9-service-parceroTV/tree/main/documentation#exploits-and-fixes)
-- [Project Structure](https://github.com/enowars/enowars9-service-parceroTV/tree/main/documentation#project-structure)
+- [Vulnerabilities](https://github.com/enowars/enowars9-service-parceroTV/tree/main/documentation#Vulnerabilities)
+- [Stats](https://github.com/enowars/enowars9-service-parceroTV/tree/main/documentation#stats)
 
 ## Introduction
 ParceroTV is a YouTube clone. It was developed with Rust (Actix Web Framework) + Sqlite and HTML/CSS/JS. On ParceroTV, users can upload, comment and watch videos, have a profile description. Create and share playlists and also upload and watch Shorts (or Reels) with captions.
